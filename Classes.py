@@ -142,7 +142,7 @@ class Validation(Annotation):
 
         differ = Differ()
         compared = differ.compare(file1, file2)
-        unaligned = []
+
         for line in compared:
             if line[0] in ("+", "-"):
                 """ on the first occurrence of a line that starts with + or -, we conclude
@@ -294,7 +294,7 @@ class Report(Annotation):
                                                                                                                 'r',
                                                                                                                 encoding='utf-8') as tx:
 
-                if (gld[-3:] == "xml"):
+                if gld[-3:] == "xml":
                     gold.append(self.generateAnn(gl.read()))
 
                 else:
@@ -303,7 +303,7 @@ class Report(Annotation):
                         originalAnn.pop()
                     gold.append(originalAnn)
 
-                if (evl[-3:] == "xml"):
+                if evl[-3:] == "xml":
                     eval.append(self.generateAnn(ev.read()))
 
                 else:
@@ -376,7 +376,8 @@ class Report(Annotation):
 
             # save output in output/FILENAMEdir
             outputDir = f"{outputfolder}/{fnS}"
-            os.mkdir(outputDir)
+            if not os.path.exists(outputDir):
+                os.mkdir(outputDir)
             content = f"""
  **PRECISION**
  strict precision: {format(strictPrecision, '.3f')}
@@ -401,7 +402,7 @@ class Report(Annotation):
     @staticmethod
     def counttpStrict(eval, gold):
 
-        if (eval.split(None, 4)[1:] == gold.split(None, 4)[1:]):
+        if eval.split(None, 4)[1:] == gold.split(None, 4)[1:]:
             return 1
 
         return 0
@@ -416,8 +417,6 @@ class Report(Annotation):
         evChar = len(ev[4])
         glChar = len(gl[4])
 
-        large = 0
-        small = 0
 
         if evChar > glChar:
             large = evChar
@@ -476,7 +475,7 @@ class Report(Annotation):
                 else:
                     check = 1
                     break
-            if (check == 0):
+            if check == 0:
                 count = count + 1
 
         for gl in gold:
@@ -713,11 +712,8 @@ border-bottom: 4px solid #023e8a;
                     if changeStatus[i][0] == changeStatus[i + 1][0]:
                         removal.append(changeStatus[i])
 
-
-
                 for r in removal:
                     changeStatus.remove(r)
-
 
                 nbLetterBefore = 0
 
@@ -931,7 +927,6 @@ border-bottom: 4px solid #023e8a;
                     text = text.replace("<s>", "")
                     text = text.replace("</s>", "")
 
-
                     if text == "":
                         text = "No matches!"
                     outputDir = f"{outputFolder}/{fnS}"
@@ -944,6 +939,6 @@ border-bottom: 4px solid #023e8a;
                     print('exception: {} -- no entries for {} in {}'.format(e, annType, fnS))
 
 
-def generateLogMessage(msg):
-    with open("errorLog.txt", "w") as log:
+def generateLogMessage(msg, outputDir):
+    with open(outputDir + "/" + "errorLog.txt", "w") as log:
         log.write(msg)
