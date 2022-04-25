@@ -1,12 +1,10 @@
-# importing the required libraries
 import os
 import shutil
 from flask import Flask, render_template, request, send_file
 from werkzeug.utils import secure_filename
-from Classes import Validation, Report, generateLogMessage
+from Classes import Validation, Report
 from zipfile import ZipFile
 from datetime import datetime
-
 
 app = Flask(__name__)
 
@@ -20,24 +18,28 @@ app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
 @app.route('/')
 def startApp():
-    return render_template('upload.html')
+    return render_template('appInterface.html')
 
 
-@app.route('/compareNER', methods=['GET', 'POST'])
-def uploadfile():
+@app.route('/compareNER', methods=['POST'])
+def compareNER():
     if request.method == 'POST':
+
         f = request.files['file']  # get the file from the files object
         visuals = request.form.getlist('entities')
 
         if "ALL" in visuals:
-            visuals = ["LOC", "PERS", "ORG", "ROLE", "DEMO", "WORK", "EVENT"]
+            visuals = ["PERS", "LOC", "ORG", "ROLE", "DEMO", "WORK", "EVENT", 'MONEY', 'DEMONYM', 'TIME', 'AMOUNT',
+                       'PERCENT', 'MEASURE']
+
         # Saving the file in the required destination
         timestamp = str(datetime.utcnow()).replace(":", ".").replace(" ", ".")
-        f.save(os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(timestamp+"_"+f.filename)))  # this will secure the file
-        savedFilePath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(timestamp+"_"+f.filename))
+        f.save(os.path.join(app.config['UPLOAD_FOLDER'],
+                            secure_filename(timestamp + "_" + f.filename)))  # this will secure the file
+        savedFilePath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(timestamp + "_" + f.filename))
         f_name, f_ext = os.path.splitext(savedFilePath)
         if f_ext != ".zip":
-            return "You uploaded unzipped file"
+            return "Please, upload .zip archive"
 
         with ZipFile(savedFilePath, 'r') as zipped:
 
@@ -53,70 +55,82 @@ def uploadfile():
                 print(ex)
 
         try:
+
+            if not os.path.exists('output'):
+                os.mkdir('output')
+
             outputFolder = f"output/output{timestamp}"
             os.mkdir(outputFolder)
 
-            if gold is not None and evalu is not None and text is not None:
+            if gold is not None and evalu is not None:
 
                 validation = Validation(gold, evalu, text, directory)
                 fileCount = validation.fileCountValidation()
 
-                if fileCount:
+                if fileCount[0]:
 
-                    extensionCheck = validation.extensionCheckValidation()
+                    wrongExtensions = validation.extensionCheckValidation()
 
-                    if not extensionCheck:
+                    if not wrongExtensions:
 
-                        alignment = validation.checkUnaligned()
-                        aligned = []
+                        conll = False
 
-                        if alignment:
+                        if fileCount[1] != 0:
+                            # if there are conll files they will be moved to another folder because they require additioanl prepocessing
+                            validation.moveConllFiles()
+                            validation.convertConllToXml()
+                            conll = True
 
-                            validation.createUnalignedLogFile(alignment, outputFolder)
+                        differentNames = validation.differentNamesValidation(conll)
 
-                            for name1, name2, lines in alignment:
-                                aligned = validation.getAligned(name1, name2)
+                        if not differentNames:
+
+                            if validation.text is not None:
+
+                                alignment = validation.checkUnaligned()
+
+                                if alignment:
+
+                                    validation.createUnalignedLogFile(alignment, outputFolder)
+                                    aligned = validation.getSomeAligned(alignment)
+
+
+                                else:
+                                    aligned = validation.getAllAligned()
+                            else:
+                                aligned = None
+
+                            report = Report(aligned, directory)
+                            report.analyze(outputFolder, conll)
+                            report.getVisualData(outputFolder, visuals, conll)
+                            shutil.make_archive(outputFolder, 'zip', outputFolder)
+                            # shutil.rmtree(outputFolder)  # removing output folder after creating zip
+                            # todo PODESITI LINKOVE ZA SERVER
+                            path = 'C:/Users/asus/PycharmProjects/flaskProject/' + outputFolder
+                            visuals.insert(0, "REPORT")
+                            tableData = report.generateTableData(path, visuals)
+                            donwnloadPath = 'C:/Users/asus/PycharmProjects/flaskProject/' + outputFolder + '.zip'
+
+                            return render_template("appInterface.html", data=tableData[0], lenData=len(tableData[0]),
+                                                   log=tableData[1], visuals=visuals, download=donwnloadPath)
 
                         else:
-                            aligned = validation.getAligned()
-
-                        report = Report(aligned, directory)
-                        report.analyze(outputFolder)
-                        report.getVisualData(outputFolder, visuals)
-                        shutil.make_archive(outputFolder, 'zip', outputFolder)
-                        shutil.rmtree(outputFolder)
-                        path = 'C:/Users/asus/PycharmProjects/flaskProject/' + outputFolder + '.zip'
-
-                        return send_file(path)
+                            return render_template("appInterface.html",
+                                                   text="There are files in gold, to_eval or text folder whose names are not the same.")
 
 
                     else:
-                        generateLogMessage("Some files have wrong extension. Only ann, xml and txt files are allowed.",
-                                           outputFolder)
-                        shutil.make_archive(outputFolder, 'zip', outputFolder)
-                        shutil.rmtree(outputFolder)
-                        path = 'C:/Users/asus/PycharmProjects/flaskProject/' + outputFolder + '.zip'
-
-                        return send_file(path)
-
+                        return render_template("appInterface.html",
+                                               text="There are files with wrong extension in following folder(s): " + ", ".join(
+                                                   wrongExtensions))
 
                 else:
-                    generateLogMessage("Number of files doesn't match in all folders.", outputFolder)
-                    shutil.make_archive(outputFolder, 'zip', outputFolder)
-                    shutil.rmtree(outputFolder)
-                    path = 'C:/Users/asus/PycharmProjects/flaskProject/' + outputFolder + '.zip'
-
-                    return send_file(path)
+                    return render_template("appInterface.html",
+                                           text="Number of files doesn't match in all folders. Please check if each ann/xml file in gold/to_eval has its corresponding txt file, or if each conll file in gold folder has its corresponding conll file in to_eval folder")
 
             else:
-                generateLogMessage(
-                    "Structure of uploaded zip file is wrong. Please include gold, to_eval and text directories.",
-                    outputFolder)
-                shutil.make_archive(outputFolder, 'zip', outputFolder)
-                shutil.rmtree(outputFolder)
-                path = 'C:/Users/asus/PycharmProjects/flaskProject/' + outputFolder + '.zip'
-
-                return send_file(path)
+                return render_template("appInterface.html",
+                                       text="Structure of uploaded zip file is wrong. Please include only gold, to_eval and text directories.")
 
 
 
@@ -125,7 +139,11 @@ def uploadfile():
             print(ex)
 
 
-
+@app.route('/download', methods=['POST'])
+def downloadFile():
+    if request.method == 'POST':
+        path = request.form.get('download')
+        return send_file(path)
 
 
 if __name__ == '__main__':

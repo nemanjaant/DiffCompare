@@ -1,5 +1,7 @@
 import os
 from difflib import Differ
+import xml.etree.ElementTree as ET
+import shutil
 
 
 class Annotation:
@@ -10,90 +12,66 @@ class Annotation:
         self.text = text
         self.directory = directory
 
-    def stripTags(self, directory, folder, file):
-        cleanUp = ["<PERS>", "</PERS>", "<ORG>", "</ORG>", "<LOC>", "</LOC>", "<ROLE>", "</ROLE>", "<DEMO>", "</DEMO>",
-                   "<EVENT>", "</EVENT>", "<WORK>", "</WORK>"]
+    @staticmethod
+    def readFromFile(path):
+        with open(path, "r", encoding='utf-8') as f:
+            file = f.read()
 
-        with open(directory + folder + file, "r", encoding="utf-8") as openFile:
-            f = openFile.read()
-            for tag in cleanUp:
-                tagless = f.replace(tag, '')
-                f = tagless
+        return file
+
+    def getTagsFromXML(self, xmldata):
+        # taking only annotation tags, which are conditioned to be capitalized
+
+        xml = ET.fromstring(xmldata)
+        tags = set()
+
+        for child in xml.iter():
+            if child.tag.isupper():
+                tags.add(child.tag)
+
+        return tags
+
+    def stripTags(self, xmldata):
+
+        cleanUp = self.getTagsFromXML(xmldata)
+        tagless = ''
+        f = xmldata
+        for tag in cleanUp:
+            tagless = f.replace("<" + tag + ">", '').replace("</" + tag + ">", '')
+            f = tagless
 
         return tagless
 
-    def generateAnn(self, f):
-        mf = f
+    def generateAnn(self, f, tags):
+
         annFormat = []
         term = 0
 
-        for i in range(len(mf)):
-
+        for i in range(len(f)):
             try:
-                if f[i] == "<" and (f[i + 1:i + 6] in ("PERS>", "ROLE>", "DEMO>", "WORK>")
-                                    or f[i + 1:i + 5] in ("LOC>", "ORG>") or f[i + 1:i + 7] in "EVENT>"):
-                    termNumber = f"T{term}"
-                    term = term + 1
+                if f[i] == "<":
 
-                    if f[i + 1:i + 6] == "PERS>":
+                    tagEnd = f.find(">", i)
+                    tag = f[i + 1:tagEnd]
+
+                    if not tag.startswith("/") and tag in tags:
+                        termNumber = f"T{term}"
+                        term = term + 1
+
                         indexStart = i
-                        indexEnd = f.find('</PERS>') - 6
-                        word = f[i + 6:indexEnd + 6]
-                        f = f[0:i] + f[i + 6:indexEnd + 6] + f[indexEnd + 13:]
-                        ann = f"{termNumber} PERS {indexStart} {indexEnd} {word}\n"
+                        alignStart = len(tag) + 2
+                        alignEnd = len(tag) + 3
+                        indexEnd = f.find('</' + tag + ">") - alignStart
+
+                        word = f[indexStart + alignStart:indexEnd + alignStart]
+
+                        f = f[0:i] + f[i + alignStart:indexEnd + alignStart] + f[indexEnd + alignStart + alignEnd:]
+
+                        ann = f"{termNumber} {tag} {indexStart} {indexEnd} {word}\n"
                         annFormat.append(ann)
 
-
-                    elif f[i + 1:i + 6] == "ROLE>":
-                        indexStart = i
-                        indexEnd = f.find('</ROLE>') - 6
-                        word = f[i + 6:indexEnd + 6]
-                        f = f[0:i] + f[i + 6:indexEnd + 6] + f[indexEnd + 13:]
-                        ann = f"{termNumber} ROLE {indexStart} {indexEnd} {word}\n"
-                        annFormat.append(ann)
-
-                    elif f[i + 1:i + 6] == "DEMO>":
-                        indexStart = i
-                        indexEnd = f.find('</DEMO>') - 6
-                        word = f[i + 6:indexEnd + 6]
-                        f = f[0:i] + f[i + 6:indexEnd + 6] + f[indexEnd + 13:]
-                        ann = f"{termNumber} DEMO {indexStart} {indexEnd} {word}\n"
-                        annFormat.append(ann)
-
-                    elif f[i + 1:i + 6] == "WORK>":
-                        indexStart = i
-                        indexEnd = f.find('</WORK>') - 6
-                        word = f[i + 6:indexEnd + 6]
-                        f = f[0:i] + f[i + 6:indexEnd + 6] + f[indexEnd + 13:]
-                        ann = f"{termNumber} WORK {indexStart} {indexEnd} {word}\n"
-                        annFormat.append(ann)
-
-                    elif f[i + 1:i + 5] == "LOC>":
-                        indexStart = i
-                        indexEnd = f.find('</LOC>') - 5
-                        word = f[i + 5:indexEnd + 5]
-                        f = f[0:i] + f[i + 5:indexEnd + 5] + f[indexEnd + 11:]
-                        ann = f"{termNumber} LOC {indexStart} {indexEnd} {word}\n"
-                        annFormat.append(ann)
-
-                    elif f[i + 1:i + 5] == "ORG>":
-                        indexStart = i
-                        indexEnd = f.find('</ORG>') - 5
-                        word = f[i + 5:indexEnd + 5]
-                        f = f[0:i] + f[i + 5:indexEnd + 5] + f[indexEnd + 11:]
-                        ann = f"{termNumber} ORG {indexStart} {indexEnd} {word}\n"
-                        annFormat.append(ann)
-
-                    elif f[i + 1:i + 7] == "EVENT>":
-                        indexStart = i
-                        indexEnd = f.find('</EVENT>') - 7
-                        word = f[i + 7:indexEnd + 7]
-                        f = f[0:i] + f[i + 7:indexEnd + 7] + f[indexEnd + 14:]
-                        ann = f"{termNumber} EVENT {indexStart} {indexEnd} {word}\n"
-                        annFormat.append(ann)
-
-            except Exception:
-                break
+            except Exception as ex:
+                continue
 
         return annFormat
 
@@ -105,35 +83,174 @@ class Annotation:
         f_name, f_ext = os.path.splitext(file)
         return f_name
 
+    def moveConllFiles(self):
+
+        for g in self.gold:
+            if g[-5:] == "conll":
+
+                newpath = self.directory + '/goldConll'
+                if not os.path.exists(newpath):
+                    os.mkdir(newpath)
+                if not os.path.exists(self.directory + '/gold/' + g + '/' + newpath):
+                    shutil.move(self.directory + '/gold/' + g, newpath)
+
+        for e in self.eval:
+            if e[-5:] == "conll":
+
+                newpath = self.directory + '/evalConll'
+                if not os.path.exists(newpath):
+                    os.mkdir(newpath)
+                if not os.path.exists(self.directory + '/to_eval/' + e + '/' + newpath):
+                    shutil.move(self.directory + '/to_eval/' + e, newpath)
+
+    @staticmethod
+    def clearUpLines(data):
+        for i in range(len(data)):
+            data[i] = data[i].replace('ᐸ', '<')
+            data[i] = data[i].replace('ᐳ', '>')
+            data[i] = data[i].replace('&', '&amp;')
+
+        return data
+
+    def convertConllToXml(self):
+
+        inputDirs = [self.directory + '/goldConll', self.directory + '/evalConll']
+
+        for dir in inputDirs:
+            data_dir = dir + "/converted"
+
+            for filename in os.listdir(dir):
+                if not os.path.exists(data_dir):
+                    os.mkdir(data_dir)
+                try:
+                    with open(os.path.join(dir, filename), 'r', encoding='utf-8') as file1:
+                        file2 = open("{}/{}.xml".format(data_dir, filename.replace(".conll", "")), "w",
+                                     encoding='utf-8')
+                        curent = []
+                        lines = file1.readlines()
+                        lines.insert(0, '* O\n')
+                        for line in lines:
+                            if line == '\n':
+                                lines.remove(line)
+
+                        self.clearUpLines(lines)
+                        file2.write('<xml>')
+                        for i in range(len(lines) - 1):
+                            item = lines[i]
+                            part = item.split()
+                            beg = part[0]  # pocetak
+                            if beg[:3] == '<p>':
+                                file2.write("\n")
+
+                            if part[1] == 'O':
+                                if len(curent) == 0:
+                                    file2.write(part[0] + " ")
+                                else:
+                                    if curent[1] == 'O':
+                                        file2.write(part[0] + " ")
+                                    else:
+                                        m = curent[1]
+                                        file2.write("</" + m[2:].upper() + ">" + " " + part[0] + " ")
+                            if part[1][0:2] in "B-":
+                                a = part[1]
+                                if curent[1][0:2] in "B-" or curent[1][0:2] in "I-":
+                                    k = curent[1]
+                                    file2.write("</" + k[2:].upper() + ">" + " " + "<" + a[2:].upper() + ">" + part[0])
+                                else:
+                                    if curent[1] == 'O':
+                                        file2.write("<" + a[2:].upper() + ">" + part[0])
+                            if part[1][0:2] in "I-":
+                                file2.write(" " + part[0])
+                            curent = part
+
+                        file2.write('</xml>')
+                except IndexError as ex:
+                    file2.write('</xml>')
+                    print(ex)
+
+            file2.close()
+
 
 class Validation(Annotation):
 
     def fileCountValidation(self):
 
-        if len(self.gold) == len(self.eval) and len(self.eval) == len(self.text):
-            return True
+        goldCount = 0
+        evalCount = 0
+
+        goldConllCount = 0
+        evalConllCount = 0
+
+        textCount = len(self.text) if self.text is not None else 0
+
+        for f in self.gold:
+
+            if f[-5:] == "conll":
+
+                goldConllCount = goldConllCount + 1
+            else:
+                goldCount = goldCount + 1
+
+        for f in self.eval:
+            if f[-5:] == "conll":
+                evalConllCount = evalConllCount + 1
+            else:
+                evalCount = evalCount + 1
+
+        if textCount > 0:
+            if goldCount == evalCount and evalCount == textCount and goldConllCount == evalConllCount:
+                return [True, goldConllCount]
+            else:
+                return [False, False]
         else:
-            return False
+            if goldCount == evalCount and goldConllCount == evalConllCount:
+                return [True, goldConllCount]
+            else:
+                return [False, False]
+
+    def differentNamesValidation(self, conll):
+
+        gold = self.gold
+        eval = self.eval
+        text = self.text
+
+        if gold is not None and eval is not None and text is not None:
+            for i, (gl, ev, txt) in enumerate(zip(gold, eval, text)):
+
+                if self.getName(gl) == self.getName(ev) and self.getName(gl) == self.getName(txt):
+                    continue
+                else:
+                    return True
+        if conll:
+            goldConllDir = os.listdir(self.directory + '/goldConll/converted')
+            evalConllDir = os.listdir(self.directory + '/evalConll/converted')
+
+            for i, (gl, ev) in enumerate(zip(goldConllDir, evalConllDir)):
+                if self.getName(gl) == self.getName(ev):
+                    continue
+                else:
+                    return True
 
     def extensionCheckValidation(self):
 
-        errors = []
+        errors = False
 
         for file in self.gold:
             f_ext = self.getExtension(file)
-            if f_ext not in ('.ann', '.xml'):
-                errors.append("There are files with wrong extensions in gold folder")
+            if f_ext not in ('.ann', '.xml', '.conll'):
+                errors = True
                 break
         for file in self.eval:
             f_ext = self.getExtension(file)
-            if f_ext not in ('.ann', '.xml'):
-                errors.append("There are files with wrong extensions in to_eval folder")
+            if f_ext not in ('.ann', '.xml', '.conll'):
+                errors = True
                 break
-        for file in self.text:
-            f_ext = self.getExtension(file)
-            if f_ext not in '.txt':
-                errors.append("There are files with wrong extensions in text folder")
-                break
+        if self.text is not None:
+            for file in self.text:
+                f_ext = self.getExtension(file)
+                if f_ext not in '.txt':
+                    errors = True
+                    break
 
         return errors
 
@@ -163,18 +280,18 @@ class Validation(Annotation):
 
         for i, (gl, ev, txt) in enumerate(zip(gold, eval, text)):
 
-            # check if both gold and to_eval directories have only .ann files
-            if self.getExtension(gl) == self.getExtension(ev) and self.getExtension(ev) == ".ann":
+            # check if current gold and to_eval files have .ann or .conll extension
+            if self.getExtension(gl) == self.getExtension(ev) and (self.getExtension(ev) in ".ann" or ".conll"):
 
-                continue
+                pass
 
             elif self.getExtension(gl) == self.getExtension(ev) and self.getExtension(ev) == ".xml":
 
-                taglessGold = self.stripTags(dirr, "/gold/", gl).splitlines(keepends=True)
-                taglessEval = self.stripTags(dirr, "/to_eval/", ev).splitlines(keepends=True)
+                taglessGold = self.stripTags(self.readFromFile(dirr + "/gold/" + gl)).splitlines(keepends=True)
+                taglessEval = self.stripTags(self.readFromFile(dirr + "/to_eval/" + ev)).splitlines(keepends=True)
                 # text files are originally tagless; though they are sent to stripTags method as it also opens a file
                 # and prepares it for processing
-                text = self.stripTags(dirr, "/text/", txt).splitlines(keepends=True)
+                text = self.readFromFile(dirr + "/text/" + txt).splitlines(keepends=True)
 
                 unaligned = self.performDiffer(taglessGold, taglessEval)
                 if not unaligned:
@@ -187,10 +304,11 @@ class Validation(Annotation):
 
 
             elif self.getExtension(gl) == ".xml":
-                # ako je samo gold xml, poredi se on sa originalnim tekstom
-                taglessGold = self.stripTags(dirr, "/gold/", gl).splitlines(keepends=True)
 
-                text = self.stripTags(dirr, "/text/", txt).splitlines(keepends=True)
+                # ako je samo gold xml, poredi se on sa originalnim tekstom
+                taglessGold = self.stripTags(self.readFromFile(dirr + "/gold/" + gl)).splitlines(keepends=True)
+
+                text = self.readFromFile(dirr + "/text/" + txt).splitlines(keepends=True)
 
                 unaligned = self.performDiffer(taglessGold, text)
 
@@ -199,9 +317,10 @@ class Validation(Annotation):
 
 
             else:
+
                 # u suprotnom, eval je xml, poredi se on sa originalnim tekstom
-                taglessEval = self.stripTags(dirr, "/to_eval/", ev).splitlines(keepends=True)
-                text = self.stripTags(dirr, "/text/", txt).splitlines(keepends=True)
+                taglessEval = self.stripTags(self.readFromFile(dirr + "/to_eval/" + ev)).splitlines(keepends=True)
+                text = self.readFromFile(dirr + "/text/" + txt).splitlines(keepends=True)
                 unaligned = self.performDiffer(taglessEval, text)
                 if unaligned:
                     unalignedList.append([ev, txt, unaligned])
@@ -222,6 +341,9 @@ class Validation(Annotation):
         text = """******************************************************
         Following files are excluded from analysis because they don't align properly. 
         You can find exact lines in which two files mismatch. 
+        
+        If you find that lines are identical please make sure files have the same encoding. For example, UTF-8 and UTF-8-BOM are not the same!
+        
         Minus and plus signs represent lines that are unique in file1 and file2 respectively. 
         Such lines should be aligned manually.\n******************************************************\n\n\n"""
         with open(f"{outputfolder}/unalignedXMLFilesLog.txt", "a", encoding="utf-8") as file:
@@ -236,84 +358,126 @@ class Validation(Annotation):
 
             file.write(text.strip() + "\n\n" + input.strip())
 
-    def getAligned(self, name1=None, name2=None):
+    def getAllAligned(self):
         gold = self.gold
         eval = self.eval
         text = self.text
         aligned = []
 
         for i, (gl, ev, txt) in enumerate(zip(gold, eval, text)):
+            aligned.append([gl, ev, txt])
 
-            if name1 is None and name2 is None:
+        return aligned
 
-                aligned.append([gl, ev, txt])
+    def getSomeAligned(self, alignment):
+        gold = self.gold
+        eval = self.eval
+        text = self.text
+        aligned = []
 
-            else:
+        for name1, name2, lines in alignment:
+            if name1 in gold:
+                index = gold.index(name1)
+                gold.pop(index)
+                eval.pop(index)
+                text.pop(index)
+                continue
 
-                if name1 not in (gl, ev, txt) or name2 not in (gl, ev, txt):
-                    aligned.append([gl, ev, txt])
+        for i, (gl, ev, txt) in enumerate(zip(gold, eval, text)):
+            aligned.append([gl, ev, txt])
 
         return aligned
 
 
 class Report(Annotation):
-    gold = []
-    eval = []
-    text = []
     dir = ''
     goldDir = ''
     evalDir = ''
     textDir = ''
+    goldRep = []
+    evalRep = []
+    textRep = []
 
     def __init__(self, files, dir):
+        self.goldRep = []
+        self.evalRep = []
+        self.textRep = []
 
-        for i, (gl, ev, txt) in enumerate(files):
-            self.gold.append(gl)
-            self.eval.append(ev)
-            self.text.append(txt)
+        if files is not None:
+            for i, (gl, ev, txt) in enumerate(files):
+                self.goldRep.append(gl)
+                self.evalRep.append(ev)
+                self.textRep.append(txt)
 
         self.dir = dir
         self.goldDir = dir + '/gold/'
         self.evalDir = dir + '/to_eval/'
         self.textDir = dir + '/text/'
+        self.goldConllDir = self.dir + '/goldConll/converted/'
+        self.evalConllDir = self.dir + '/evalConll/converted/'
 
-    def generateDataForAnalysis(self):
+    def generateDataForAnalysis(self, conll=False):
 
         data = []
         gold = []
         eval = []
         text = []
         fileName = []
-        # generating data for analysis
-        for i, (gld, evl, txt) in enumerate((zip(self.gold, self.eval, self.text))):
+        # generating data for analysis of xml and ann files
+        if self.textRep is not None:
+            for i, (gld, evl, txt) in enumerate((zip(self.goldRep, self.evalRep, self.textRep))):
 
-            goldPath = self.goldDir + gld
-            evalPath = self.evalDir + evl
-            txtPath = self.textDir + txt
-            with open(goldPath, 'r', encoding='utf-8') as gl, open(evalPath, 'r', encoding='utf-8') as ev, open(txtPath,
-                                                                                                                'r',
-                                                                                                                encoding='utf-8') as tx:
+                goldPath = self.goldDir + gld
+                evalPath = self.evalDir + evl
+                txtPath = self.textDir + txt
+                with open(goldPath, 'r', encoding='utf-8') as gl, open(evalPath, 'r', encoding='utf-8') as ev, open(
+                        txtPath,
+                        'r',
+                        encoding='utf-8') as tx:
 
-                if gld[-3:] == "xml":
-                    gold.append(self.generateAnn(gl.read()))
+                    if gld[-3:] == "xml":
+                        goldText = gl.read()
+                        tags = self.getTagsFromXML(goldText)
+                        gold.append(self.generateAnn(goldText, tags))
 
-                else:
-                    originalAnn = gl.readlines()
-                    if originalAnn[len(originalAnn) - 1] == '\n':
-                        originalAnn.pop()
-                    gold.append(originalAnn)
+                    else:
+                        originalAnn = gl.readlines()
+                        if originalAnn[len(originalAnn) - 1] == '\n':
+                            originalAnn.pop()
+                        gold.append(originalAnn)
 
-                if evl[-3:] == "xml":
-                    eval.append(self.generateAnn(ev.read()))
+                    if evl[-3:] == "xml":
+                        evalText = ev.read()
+                        tags = self.getTagsFromXML(evalText)
+                        eval.append(self.generateAnn(evalText, tags))
 
-                else:
-                    originalAnn = ev.readlines()
-                    if originalAnn[len(originalAnn) - 1] == '\n':
-                        originalAnn.pop()
-                    eval.append(originalAnn)
+                    else:
+                        originalAnn = ev.readlines()
+                        if originalAnn[len(originalAnn) - 1] == '\n':
+                            originalAnn.pop()
+                        eval.append(originalAnn)
 
-                text.append(tx.read())
-                fileName.append(gld[0:-4])
+                    text.append(tx.read())
+                    fileName.append(gld[0:-4])
+
+        # generating data for analysis of conll files
+        if conll:
+            for filename in os.listdir(self.goldConllDir):
+                fileName.append(filename[0:-4])
+                goldPath = self.goldConllDir + filename
+
+                with open(goldPath, 'r', encoding='utf-8') as gl:
+                    go = gl.read()
+                    text.append(self.stripTags(go))
+                    tags = self.getTagsFromXML(go)
+                    gold.append(self.generateAnn(go, tags))
+
+            for filename in os.listdir(self.evalConllDir):
+                evPath = self.evalConllDir + filename
+                with open(evPath, 'r', encoding='utf-8') as ev:
+                    eva = ev.read()
+                    tags = self.getTagsFromXML(eva)
+                    eval.append(self.generateAnn(eva, tags))
 
         data.append(gold)
         data.append(eval)
@@ -322,12 +486,13 @@ class Report(Annotation):
 
         return data
 
-    def analyze(self, outputfolder):
+    def analyze(self, outputfolder, conll):
 
-        data = self.generateDataForAnalysis()
+        data = self.generateDataForAnalysis(conll)
         gold = data[0]
         eval = data[1]
         fileName = data[3]
+
         # quantitative analysis
 
         for i, (glS, evS, fnS) in enumerate((zip(gold, eval, fileName))):
@@ -412,21 +577,18 @@ class Report(Annotation):
 
         ev = eval.split(None, 4)
         gl = gold.split(None, 4)
+
+        if ev[1:] == gl[1:]:
+            return 1
+
         evRange = set(range(int(ev[2]), int(ev[3]) + 1))
         glRange = set(range(int(gl[2]), int(gl[3]) + 1))
         evChar = len(ev[4])
         glChar = len(gl[4])
 
-
-        if evChar > glChar:
-            large = evChar
-            small = glChar
-        else:
-            large = glChar
-            small = evChar
-
         if evRange.intersection(glRange):
-            return small / large
+            numberOfIntersectedChars = len(evRange.intersection(glRange))
+            return numberOfIntersectedChars / (evChar + glChar)
 
         return 0
 
@@ -663,14 +825,14 @@ border-bottom: 4px solid #023e8a;
 
         return 0
 
-    def getVisualData(self, outputFolder, annTypes):
+    def getVisualData(self, outputFolder, annTypes, conll):
 
-        data = self.generateDataForAnalysis()
+        data = self.generateDataForAnalysis(conll)
         gold = data[0]
         eval = data[1]
         text = data[2]
         fileName = data[3]
-        # quantitative analysis
+        # qualitative analysis
 
         for i, (glS, evS, txT, fnS) in enumerate((zip(gold, eval, text, fileName))):
 
@@ -680,7 +842,6 @@ border-bottom: 4px solid #023e8a;
                 evN = self.splitByAnnType(evS, annType)
                 text = txT
 
-                status = 1
                 changeStatus = []
                 for e in evN:
                     if e[1] == e[2]:
@@ -927,8 +1088,6 @@ border-bottom: 4px solid #023e8a;
                     text = text.replace("<s>", "")
                     text = text.replace("</s>", "")
 
-                    if text == "":
-                        text = "No matches!"
                     outputDir = f"{outputFolder}/{fnS}"
                     name = fnS + "_" + annType + ".html"
                     htmlTemplate = self.getHTMLTemplate()
@@ -938,7 +1097,29 @@ border-bottom: 4px solid #023e8a;
                 except Exception as e:
                     print('exception: {} -- no entries for {} in {}'.format(e, annType, fnS))
 
+    def generateTableData(self, path, visuals):
+        global present
+        links = []
+        logFilePath = None
 
-def generateLogMessage(msg, outputDir):
-    with open(outputDir + "/" + "errorLog.txt", "w") as log:
-        log.write(msg)
+        for folder in os.listdir(path):
+            if folder[-3:] != 'txt':
+                rowData = [folder]
+                for visType in visuals:
+                    present = False
+                    folderPath = path + '/' + folder
+                    for file in os.listdir(folderPath):
+
+                        if visType in file:
+                            present = True
+                            rowData.append(folderPath + '/' + file)
+                            break
+
+                    if not present:
+                        rowData.append("-")
+
+                links.append(rowData)
+            else:
+                logFilePath = path + '/' + folder
+
+        return [links, logFilePath]
