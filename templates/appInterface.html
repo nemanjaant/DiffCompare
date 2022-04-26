@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DiffCompare</title>
+    <style>
+        body {
+            background: #F0F0F0;
+            font-family: times, Times New Roman, times-roman, georgia, serif;
+
+        }
+
+
+        input {
+            background-color: orange;
+            border: none;
+            text-decoration: none;
+            color: white;
+            padding: 10px 10px;
+            margin: 5px 5px;
+            cursor: pointer;
+        }
+        #instructions {
+            border-top: 1px solid #4C3C1B;
+            margin-bottom: 30px;
+
+        }
+
+        #inputBlocks{
+            display: flex;
+            justify-content:space-between;
+        }
+
+        .left{
+            width:30%;
+        }
+        .right {
+            width:60%;
+        }
+
+
+        .title {
+            text-align: center;
+            font-size: 20px;
+            color: #222;
+        }
+
+
+        .form-row {
+            width: 30%;
+            display: flex;
+            flex-direction: column;
+
+        }
+
+
+        .form-row input[type="submit"] {
+            width: 30%;
+            margin: 10px 0;
+
+        }
+
+        #zipLabel, #typesLabel{
+            font-size:1.5rem;
+            margin:10px 0;
+
+        }
+
+        .row:nth-of-type(14){
+            margin-top: 15px;
+            font-weight: 600;
+        }
+
+        #outputDiv{
+            width:80%;
+            margin:0 auto;
+            min-height:10vh;
+        }
+
+      #outputTable {
+  border-collapse: collapse;
+          width:100%;
+
+
+}
+
+#outputTable td, #outputTable th {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+
+#outputTable th:first-child, #outputTable td:first-child{
+    text-align: center;
+}
+
+#outputTable tr:nth-child(even){background-color: #f2f2f2;}
+
+#outputTable tr:hover {background-color: #ddd;}
+
+#outputTable th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  text-align: left;
+  background-color: orange;
+  color: white;
+}
+
+.note{
+    color:red;
+}
+
+        
+    </style>
+</head>
+
+<body>
+
+    <div id="instructions">
+
+        <h1 class="title">DiffCompare tool for NER evaluation</h1>
+
+        <div id="inputBlocks">
+        <div class="left">
+            <span>Upload a .zip file with the following structure:</span>
+            <div>
+                f.zip <br>
+                ├── gold/ <br>
+                └──── f1.ann/xml/conll<br>
+                └──── f2.ann/xml/conll <br>
+                └──── f3.ann/xml/conll <br>
+                ├── to_eval/ <br>
+                └──── f1.ann/xml/conll <br>
+                └──── f2.ann/xml/conll <br>
+                └──── f3.ann/xml/conll <br>
+                ├── text/<span class="note">*</span> <br>
+                └──── f1.txt <br>
+                └──── f2.txt <br>
+                └──── f3.txt <br>
+
+            </div>
+            <ul>
+                <li>gold/ directory can contain .xml, .conll and .ann files</li>
+
+                <li>to_eval/ directory can contain .xml, .conll and .ann files</li>
+
+                <li><span class="note">*</span>txt file is not required for comparing .conll files</li>
+
+                <li>it is required that the files to be evaluated and their corresponding gold standards and text files have the same
+                    name</li>
+
+                <li>it is required that xml files (excluding NER tags) align with their text correspondents</li>
+
+                <li>if xml files (excluding NER tags) don't align with their text correspondents, you will be notified
+                    about the exact lines that need to be aligned</li>
+
+                <li>if you don't get visualization for desired entity, it means it's not present in annotated files</li>
+                <li>if you don't get proper output for cases where some files are of ann type, characters in ann probably don't align with corresponding text/xml files</li>
+                <li>size of zipped file can't exceed 20 MB</li>
+
+            </ul>
+            <h4>This tool was developed by Nemanja Antanasijević as a part of Master's thesis supervised by prof. Ranka Stanković and Milica Ikonić Nešić.</h4>
+        </div>
+
+        <div class="right">
+
+            <form action="http://localhost:5000/compareNER" method="POST" enctype="multipart/form-data">
+
+                <div class="form-row">
+                    <label for="file" id="zipLabel">Zip file:</label>
+                    <input type="file" name="file" />
+                    <label for="entities" id="typesLabel">Types of entities for visualization:</label>
+
+                    <div class="row">
+                        <input id="PERS" type="checkbox" name="entities" value="PERS">
+                        <label for="PERS">PERS</label>
+                    </div>
+                    <div class="row">
+                        <input id="LOC" type="checkbox" name="entities" value="LOC">
+                        <label for="LOC">LOC</label>
+                    </div>
+                    <div class="row">
+                        <input id="ORG" type="checkbox" name="entities" value="ORG">
+                        <label for="ORG">ORG</label>
+                    </div>
+                    <div class="row">
+                        <input id="ROLE" type="checkbox" name="entities" value="ROLE">
+                        <label for="ROLE">ROLE</label>
+                    </div>
+                    <div class="row">
+                        <input id="DEMO" type="checkbox" name="entities" value="DEMO">
+                        <label for="DEMO">DEMO</label>
+                    </div>
+                    <div class="row">
+                        <input id="WORK" type="checkbox" name="entities" value="WORK">
+                        <label for="WORK">WORK</label>
+                    </div>
+                    <div class="row">
+                        <input id="EVENT" type="checkbox" name="entities" value="EVENT">
+                        <label for="EVENT">EVENT</label>
+                    </div>
+                    <div class="row">
+                        <input id="MONEY" type="checkbox" name="entities" value="MONEY">
+                        <label for="MONEY">MONEY</label>
+                    </div>
+                    <div class="row">
+                        <input id="DEMONYM" type="checkbox" name="entities" value="DEMONYM">
+                        <label for="DEMONYM">DEMONYM</label>
+                    </div>
+                    <div class="row">
+                        <input id="TIME" type="checkbox" name="entities" value="TIME">
+                        <label for="TIME">TIME</label>
+                    </div>
+                    <div class="row">
+                        <input id="AMOUNT" type="checkbox" name="entities" value="AMOUNT">
+                        <label for="AMOUNT">AMOUNT</label>
+                    </div>
+                    <div class="row">
+                        <input id="PERCENT" type="checkbox" name="entities" value="PERCENT">
+                        <label for="PERCENT">PERCENT</label>
+                    </div>
+                    <div class="row">
+                        <input id="MEASURE" type="checkbox" name="entities" value="MEASURE">
+                        <label for="MEASURE">MEASURE</label>
+                    </div>
+
+
+                    <div class="row">
+                        <input id="ALL" type="checkbox" name="entities" value="ALL">
+                        <label for="ALL">ALL</label>
+                    </div>
+                    <div class="row">
+                        <input type="submit" value="Upload" />
+                    </div>
+                </div>
+            </form>
+            <div id="info">
+
+                <h1>{{ text }}</h1>
+
+            </div>
+
+        </div>
+    </div>
+    </div>
+    {% if visuals and (data or log)%}
+
+    <div id="outputDiv">
+    <h1>Output</h1>
+
+    {% if log %}
+        <p>There are unaligned input files, which are not analyzed. Check unaligned lines on <a href="{{ log }}" target="_blank">the link</a></p>
+     {% endif %}
+    <form action="http://localhost:5000/download" method="POST">
+        <input type="submit" value="Download files" />
+        <input type="hidden" value="{{ download }}" name="download">
+    </form>
+
+        <table id="outputTable">
+
+            <thead>
+                <tr>
+                    <th>FILE NAME</th>
+                    {% for type in visuals %}
+                    <th>{{ type }}</th>
+                    {% endfor  %}
+                </tr>
+
+            </thead>
+            <tbody>
+                {% for i in range(0, lenData) %}
+                    <tr>
+                        {% for row in data[i] %}
+                            {% if row==data[i][0] %}
+                            <td>{{ row }}</td>
+                            {% else  %}
+                            {% if row != "-"%}
+                            <td><a href="{{ row }}" target="_blank">URL</a></td>
+                            {% else %}
+                            <td>X</td>
+                            {% endif  %}
+                            {% endif  %}
+                        {% endfor  %}
+                    </tr>
+                {% endfor  %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+</body>
+
+</html>
