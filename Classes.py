@@ -390,15 +390,17 @@ class Validation(Annotation):
 
 
 class Report(Annotation):
-    dir = ''
-    goldDir = ''
-    evalDir = ''
-    textDir = ''
-    goldRep = []
-    evalRep = []
-    textRep = []
+
 
     def __init__(self, files, dir):
+        self.dir = dir
+
+        self.goldDir = dir + '/gold/'
+        self.evalDir = dir + '/to_eval/'
+        self.textDir = dir + '/text/'
+        self.goldConllDir = self.dir + '/goldConll/converted/'
+        self.evalConllDir = self.dir + '/evalConll/converted/'
+
         self.goldRep = []
         self.evalRep = []
         self.textRep = []
@@ -409,12 +411,8 @@ class Report(Annotation):
                 self.evalRep.append(ev)
                 self.textRep.append(txt)
 
-        self.dir = dir
-        self.goldDir = dir + '/gold/'
-        self.evalDir = dir + '/to_eval/'
-        self.textDir = dir + '/text/'
-        self.goldConllDir = self.dir + '/goldConll/converted/'
-        self.evalConllDir = self.dir + '/evalConll/converted/'
+
+
 
     def generateDataForAnalysis(self, conll=False):
 
