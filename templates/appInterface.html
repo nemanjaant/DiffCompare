@@ -257,7 +257,7 @@
         <input type="submit" value="Download files" />
         <input type="hidden" value="{{ download }}" name="download">
     </form>
-
+    {% if data%}
         <table id="outputTable">
 
             <thead>
@@ -287,6 +287,7 @@
                 {% endfor  %}
             </tbody>
         </table>
+        {% endif %}
     </div>
     {% endif %}
 
