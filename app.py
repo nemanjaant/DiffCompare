@@ -28,6 +28,8 @@ def compareNER():
         f = request.files['file']  # get the file from the files object
         visuals = request.form.getlist('entities')
 
+
+
         if "ALL" in visuals:
             visuals = ["PERS", "LOC", "ORG", "ROLE", "DEMO", "WORK", "EVENT", 'MONEY', 'DEMONYM', 'TIME', 'AMOUNT',
                        'PERCENT', 'MEASURE']
@@ -47,9 +49,23 @@ def compareNER():
             zipped.extractall(directory)
 
             try:
-                gold = os.listdir(directory + '/gold') if os.path.isdir(directory + '/gold/') else None
-                evalu = os.listdir(directory + '/to_eval') if os.path.isdir(directory + '/to_eval/') else None
-                text = os.listdir(directory + '/text') if os.path.isdir(directory + '/text/') else None
+
+                #os.listdir(directory + '/gold') if os.path.isdir(directory + '/gold/') else
+                gold =  None
+                evalu =  None
+                text =  None
+                folder = os.listdir(directory)
+                wrongFolders = False
+
+                for item in folder:
+                    if item == 'gold':
+                        gold = os.listdir(directory + '/gold')
+                    elif item == 'to_eval':
+                        evalu = os.listdir(directory + '/to_eval')
+                    elif item == 'text':
+                        text = os.listdir(directory + '/text')
+                    else:
+                        wrongFolders = True
 
             except Exception as ex:
                 print(ex)
@@ -62,7 +78,7 @@ def compareNER():
             outputFolder = f"output/output{timestamp}"
             os.mkdir(outputFolder)
 
-            if gold is not None and evalu is not None:
+            if gold is not None and evalu is not None and not wrongFolders:
 
                 validation = Validation(gold, evalu, text, directory)
                 fileCount = validation.fileCountValidation()
@@ -71,6 +87,7 @@ def compareNER():
 
                     wrongExtensions = validation.extensionCheckValidation()
 
+
                     if not wrongExtensions:
 
                         conll = False
@@ -78,7 +95,6 @@ def compareNER():
                         if fileCount[1] != 0:
                             # if there are conll files they will be moved to another folder because they require additioanl prepocessing
                             validation.moveConllFiles()
-                            validation.convertConllToXml()
                             conll = True
 
                         differentNames = validation.differentNamesValidation(conll)
@@ -100,9 +116,13 @@ def compareNER():
                             else:
                                 aligned = None
 
+                            if conll:
+                                validation.convertConllToXml()
+
                             report = Report(aligned, directory)
-                            report.analyze(outputFolder, conll)
-                            report.getVisualData(outputFolder, visuals, conll)
+                            data = report.generateDataForAnalysis(conll)
+                            report.analyze(outputFolder, data)
+                            report.getVisualData(outputFolder, visuals, data)
                             shutil.make_archive(outputFolder, 'zip', outputFolder)
                             # shutil.rmtree(outputFolder)  # removing output folder after creating zip
                             # todo PODESITI LINKOVE ZA SERVER
@@ -116,17 +136,16 @@ def compareNER():
 
                         else:
                             return render_template("appInterface.html",
-                                                   text="There are files in gold, to_eval or text folder whose names are not the same.")
+                                                   text="There are files in gold, to_eval or text folder whose names are unique and don't have their pairs.")
 
 
                     else:
                         return render_template("appInterface.html",
-                                               text="There are files with wrong extension in following folder(s): " + ", ".join(
-                                                   wrongExtensions))
+                                               text="There are files with wrong extension. Please include only ann, xml, conll and txt files in their respective folders.")
 
                 else:
                     return render_template("appInterface.html",
-                                           text="Number of files doesn't match in all folders. Please check if each ann/xml file in gold/to_eval has its corresponding txt file, or if each conll file in gold folder has its corresponding conll file in to_eval folder")
+                                           text="Number of files doesn't match in all folders. Please check if each ann/xml file in gold/to_eval has its corresponding txt file, or if each conll file in gold folder has its corresponding conll file in to_eval folder.")
 
             else:
                 return render_template("appInterface.html",

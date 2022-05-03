@@ -222,8 +222,8 @@ class Validation(Annotation):
                 else:
                     return True
         if conll:
-            goldConllDir = os.listdir(self.directory + '/goldConll/converted')
-            evalConllDir = os.listdir(self.directory + '/evalConll/converted')
+            goldConllDir = os.listdir(self.directory + '/goldConll')
+            evalConllDir = os.listdir(self.directory + '/evalConll')
 
             for i, (gl, ev) in enumerate(zip(goldConllDir, evalConllDir)):
                 if self.getName(gl) == self.getName(ev):
@@ -484,9 +484,9 @@ class Report(Annotation):
 
         return data
 
-    def analyze(self, outputfolder, conll):
+    def analyze(self, outputfolder, data):
 
-        data = self.generateDataForAnalysis(conll)
+
         gold = data[0]
         eval = data[1]
         fileName = data[3]
@@ -560,7 +560,6 @@ class Report(Annotation):
             with open(outputDir + "/" + str(fnS) + "_REPORT.txt", 'w', encoding='utf-8') as out:
                 out.write(content)
 
-        return True
 
     @staticmethod
     def counttpStrict(eval, gold):
@@ -823,9 +822,9 @@ border-bottom: 4px solid #023e8a;
 
         return 0
 
-    def getVisualData(self, outputFolder, annTypes, conll):
+    def getVisualData(self, outputFolder, visuals, data):
 
-        data = self.generateDataForAnalysis(conll)
+
         gold = data[0]
         eval = data[1]
         text = data[2]
@@ -834,7 +833,7 @@ border-bottom: 4px solid #023e8a;
 
         for i, (glS, evS, txT, fnS) in enumerate((zip(gold, eval, text, fileName))):
 
-            for annType in annTypes:
+            for annType in visuals:
 
                 glN = self.splitByAnnType(glS, annType)
                 evN = self.splitByAnnType(evS, annType)
