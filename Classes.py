@@ -22,25 +22,34 @@ class Annotation:
     def getTagsFromXML(self, xmldata):
         # taking only annotation tags, which are conditioned to be capitalized
 
-        xml = ET.fromstring(xmldata)
-        tags = set()
+        try:
+            xml = ET.fromstring(xmldata)
+            tags = set()
 
-        for child in xml.iter():
-            if child.tag.isupper():
-                tags.add(child.tag)
+            for child in xml.iter():
+                if child.tag.isupper():
+                    tags.add(child.tag)
 
-        return tags
+            return tags
+
+        except Exception as ex:
+            print(ex)
+
+
 
     def stripTags(self, xmldata):
+        try:
+            cleanUp = self.getTagsFromXML(xmldata)
+            tagless = ''
+            f = xmldata
+            for tag in cleanUp:
+                tagless = f.replace("<" + tag + ">", '').replace("</" + tag + ">", '')
+                f = tagless
 
-        cleanUp = self.getTagsFromXML(xmldata)
-        tagless = ''
-        f = xmldata
-        for tag in cleanUp:
-            tagless = f.replace("<" + tag + ">", '').replace("</" + tag + ">", '')
-            f = tagless
+            return tagless
 
-        return tagless
+        except Exception as ex:
+            print(ex)
 
     def generateAnn(self, f, tags):
 
@@ -69,6 +78,8 @@ class Annotation:
 
                         ann = f"{termNumber} {tag} {indexStart} {indexEnd} {word}\n"
                         annFormat.append(ann)
+
+
 
             except Exception as ex:
                 continue
@@ -280,12 +291,15 @@ class Validation(Annotation):
 
         for i, (gl, ev, txt) in enumerate(zip(gold, eval, text)):
 
+
+
             # check if current gold and to_eval files have .ann or .conll extension
             if self.getExtension(gl) == self.getExtension(ev) and (self.getExtension(ev) in ".ann" or ".conll"):
 
                 pass
 
-            elif self.getExtension(gl) == self.getExtension(ev) and self.getExtension(ev) == ".xml":
+            if self.getExtension(gl) == self.getExtension(ev) and self.getExtension(ev) == ".xml":
+
 
                 taglessGold = self.stripTags(self.readFromFile(dirr + "/gold/" + gl)).splitlines(keepends=True)
                 taglessEval = self.stripTags(self.readFromFile(dirr + "/to_eval/" + ev)).splitlines(keepends=True)
@@ -302,8 +316,8 @@ class Validation(Annotation):
                 else:
                     unalignedList.append([gl, ev, unaligned])
 
+            if self.getExtension(gl) == ".xml" and self.getExtension(ev) != ".xml":
 
-            elif self.getExtension(gl) == ".xml":
 
                 # ako je samo gold xml, poredi se on sa originalnim tekstom
                 taglessGold = self.stripTags(self.readFromFile(dirr + "/gold/" + gl)).splitlines(keepends=True)
@@ -315,8 +329,8 @@ class Validation(Annotation):
                 if unaligned:
                     unalignedList.append([gl, txt, unaligned])
 
+            if self.getExtension(ev) == ".xml" and self.getExtension(gl) != ".xml":
 
-            else:
 
                 # u suprotnom, eval je xml, poredi se on sa originalnim tekstom
                 taglessEval = self.stripTags(self.readFromFile(dirr + "/to_eval/" + ev)).splitlines(keepends=True)
@@ -840,6 +854,7 @@ border-bottom: 4px solid #023e8a;
                 text = txT
 
                 changeStatus = []
+
                 for e in evN:
                     if e[1] == e[2]:
                         continue
@@ -848,6 +863,8 @@ border-bottom: 4px solid #023e8a;
 
                     changeStatus.append([start, 1])
                     changeStatus.append([end, 3])
+
+
 
                 for g in glN:
                     if g[1] == g[2]:
@@ -862,7 +879,11 @@ border-bottom: 4px solid #023e8a;
                     status = 4 if not self.containsKey(changeStatus, end) else self.getValueByKey(changeStatus, end) + 5
                     changeStatus.append([end, status])
 
+
+
+
                 changeStatus = sorted(changeStatus)
+
                 removal = []
 
                 for i in range(len(changeStatus) - 1):
@@ -873,7 +894,11 @@ border-bottom: 4px solid #023e8a;
                 for r in removal:
                     changeStatus.remove(r)
 
+
+
                 nbLetterBefore = 0
+
+
 
                 try:
                     entrys = changeStatus
@@ -940,18 +965,24 @@ border-bottom: 4px solid #023e8a;
 
                             if entrys[i][1] == 3 or entrys[i][1] == 4:
 
+
                                 if textStatus == 2:
+
                                     entrys[i][1] = entrys[i][1] + 8
+
 
 
                                 else:
                                     textStatus = textStatus - 1
 
-                            if entrys[i][1] == 5 or entrys[i][1] == 15 or entrys[i][1] == 25:
+                            if entrys[i][1] == 5:
 
                                 if x == 2:
 
+
                                     if entrys[i + 1][1] == 11:
+
+
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT1_all"><span class="TT2_sta">' + text[
@@ -959,13 +990,17 @@ border-bottom: 4px solid #023e8a;
                                                                                                                                  i][
                                                                                                                                  0] + nbLetterBefore:]
                                     if entrys[i + 1][1] == 12:
+
+
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT1_sta"><span class="TT2_all">' + text[
                                                                                                                              entrys[
                                                                                                                                  i][
                                                                                                                                  0] + nbLetterBefore:]
+
                                     if entrys[i + 1][1] == 8:
+
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT1_all"><span class="TT2_all">' + text[
@@ -981,6 +1016,7 @@ border-bottom: 4px solid #023e8a;
                                 textStatus = textStatus - 2
 
                             if entrys[i][1] == 9:
+
 
                                 if x == 2:
                                     if entrys[i + 1][1] == 11:
@@ -1011,6 +1047,7 @@ border-bottom: 4px solid #023e8a;
 
                             if entrys[i][1] == 10:
 
+
                                 if x == 2:
                                     if entrys[i + 1][1] == 11:
                                         text = text[
@@ -1027,6 +1064,7 @@ border-bottom: 4px solid #023e8a;
                                                                                                                                  i][
                                                                                                                                  0] + nbLetterBefore:]
                                     if entrys[i + 1][1] == 8:
+
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT1_end"><span class="TT2_all">' + text[
@@ -1034,19 +1072,23 @@ border-bottom: 4px solid #023e8a;
                                                                                                                                  i][
                                                                                                                                  0] + nbLetterBefore:]
 
+
                                     nbLetterBefore = nbLetterBefore + 44
 
                                 textStatus = textStatus + 1
 
                             if entrys[i][1] == 11:
 
+
                                 if x == 2:
                                     if entrys[i + 1][1] == 4 or entrys[i + 1][1] == 6:
+
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT2_end">' + text[entrys[i][
                                                                                                                 0] + nbLetterBefore:]
                                     if entrys[i + 1][1] == 9:
+
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT2_mid">' + text[entrys[i][
@@ -1059,12 +1101,13 @@ border-bottom: 4px solid #023e8a;
                             if entrys[i][1] == 12:
 
                                 if x == 2:
+
                                     if entrys[i + 1][1] == 3 or entrys[i + 1][1] == 7:
                                         text = text[
                                                0:entrys[i][0] + nbLetterBefore] + '<span class="TT1_end">' + text[
                                                                                                              entrys[i][
                                                                                                                  0] + nbLetterBefore:]
-                                    if entrys[i + 1][1] == 9:
+                                    if entrys[i + 1][1] == 10:
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT1_mid">' + text[entrys[i][
@@ -1076,8 +1119,11 @@ border-bottom: 4px solid #023e8a;
 
                         if x == 2:
                             for c in range(textStatus + 1):
+
                                 text = text[0:entrys[i][0] + nbLetterBefore] + '</span>' + text[entrys[i][
                                                                                                     0] + nbLetterBefore:]
+
+
 
                     # creating a file
                     text = text.replace("ᐸ", "<")
