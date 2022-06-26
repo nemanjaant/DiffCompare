@@ -137,44 +137,51 @@ class Annotation:
                     with open(os.path.join(dir, filename), 'r', encoding='utf-8') as file1:
                         file2 = open("{}/{}.xml".format(data_dir, filename.replace(".conll", "")), "w",
                                      encoding='utf-8')
-                        curent = []
                         lines = file1.readlines()
-                        lines.insert(0, '* O\n')
-                        for line in lines:
-                            if line == '\n':
-                                lines.remove(line)
-
                         self.clearUpLines(lines)
-                        file2.write('<xml>')
-                        for i in range(len(lines) - 1):
-                            item = lines[i]
-                            part = item.split()
-                            beg = part[0]  # pocetak
-                            if beg[:3] == '<p>':
-                                file2.write("\n")
+                        file2.write('<xml>\n')
+                        numberOfLines = len(lines)
 
-                            if part[1] == 'O':
-                                if len(curent) == 0:
-                                    file2.write(part[0] + " ")
-                                else:
-                                    if curent[1] == 'O':
-                                        file2.write(part[0] + " ")
-                                    else:
-                                        m = curent[1]
-                                        file2.write("</" + m[2:].upper() + ">" + " " + part[0] + " ")
-                            if part[1][0:2] in "B-":
-                                a = part[1]
-                                if curent[1][0:2] in "B-" or curent[1][0:2] in "I-":
-                                    k = curent[1]
-                                    file2.write("</" + k[2:].upper() + ">" + " " + "<" + a[2:].upper() + ">" + part[0])
-                                else:
-                                    if curent[1] == 'O':
-                                        file2.write("<" + a[2:].upper() + ">" + part[0])
-                            if part[1][0:2] in "I-":
-                                file2.write(" " + part[0])
-                            curent = part
+                        for i in range(numberOfLines):
+                            item = lines[i].split()
 
-                        file2.write('</xml>')
+                            if not item:
+                                item = ['', '']
+
+                            beg = item[0]
+                            mark = item[1]
+                            nextEl = None
+
+                            if i <= numberOfLines - 1:
+                                if not i + 1 > numberOfLines - 1:
+                                    nextEl = lines[i + 1].split()
+                                    if not nextEl:
+                                        nextEl = ['', '']
+
+                            if beg == '':
+                                file2.write('\n')
+
+                            if mark == 'O':
+                                file2.write(beg + ' ')
+
+                            if mark[0:2] == 'B-':
+                                entry = "<{}>{}".format(mark[2:], beg)
+                                file2.write(entry)
+
+                                if nextEl[1] in ('', 'O') or nextEl[1][0:2] == 'B-':
+                                    entry = "</{}> ".format(mark[2:])
+                                    file2.write(entry)
+
+                            if mark[0:2] == 'I-':
+
+                                if nextEl[1] in ('', 'O') or nextEl[1][0:2] == 'B-':
+                                    entry = " {}</{}> ".format(beg, mark[2:])
+                                    file2.write(entry)
+
+                                else:
+                                    file2.write(" "+beg)
+
+                        file2.write('\n</xml>')
                 except IndexError as ex:
                     file2.write('</xml>')
                     print(ex)
