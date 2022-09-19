@@ -2,6 +2,7 @@ import os
 from difflib import Differ
 import xml.etree.ElementTree as ET
 import shutil
+import numpy as np
 
 
 class Annotation:
@@ -34,8 +35,6 @@ class Annotation:
 
         except Exception as ex:
             print(ex)
-
-
 
     def stripTags(self, xmldata):
         try:
@@ -165,21 +164,21 @@ class Annotation:
                                 file2.write(beg + ' ')
 
                             if mark[0:2] == 'B-':
-                                entry = "<{}>{}".format(mark[2:], beg)
+                                entry = "<{}>{}".format(mark[2:].upper(), beg)
                                 file2.write(entry)
 
                                 if nextEl[1] in ('', 'O') or nextEl[1][0:2] == 'B-':
-                                    entry = "</{}> ".format(mark[2:])
+                                    entry = "</{}> ".format(mark[2:].upper())
                                     file2.write(entry)
 
                             if mark[0:2] == 'I-':
 
                                 if nextEl[1] in ('', 'O') or nextEl[1][0:2] == 'B-':
-                                    entry = " {}</{}> ".format(beg, mark[2:])
+                                    entry = " {}</{}> ".format(beg, mark[2:].upper())
                                     file2.write(entry)
 
                                 else:
-                                    file2.write(" "+beg)
+                                    file2.write(" " + beg)
 
                         file2.write('\n</xml>')
                 except IndexError as ex:
@@ -298,15 +297,11 @@ class Validation(Annotation):
 
         for i, (gl, ev, txt) in enumerate(zip(gold, eval, text)):
 
-
-
             # check if current gold and to_eval files have .ann or .conll extension
             if self.getExtension(gl) == self.getExtension(ev) and (self.getExtension(ev) in ".ann" or ".conll"):
-
                 pass
 
             if self.getExtension(gl) == self.getExtension(ev) and self.getExtension(ev) == ".xml":
-
 
                 taglessGold = self.stripTags(self.readFromFile(dirr + "/gold/" + gl)).splitlines(keepends=True)
                 taglessEval = self.stripTags(self.readFromFile(dirr + "/to_eval/" + ev)).splitlines(keepends=True)
@@ -325,7 +320,6 @@ class Validation(Annotation):
 
             if self.getExtension(gl) == ".xml" and self.getExtension(ev) != ".xml":
 
-
                 # ako je samo gold xml, poredi se on sa originalnim tekstom
                 taglessGold = self.stripTags(self.readFromFile(dirr + "/gold/" + gl)).splitlines(keepends=True)
 
@@ -337,7 +331,6 @@ class Validation(Annotation):
                     unalignedList.append([gl, txt, unaligned])
 
             if self.getExtension(ev) == ".xml" and self.getExtension(gl) != ".xml":
-
 
                 # u suprotnom, eval je xml, poredi se on sa originalnim tekstom
                 taglessEval = self.stripTags(self.readFromFile(dirr + "/to_eval/" + ev)).splitlines(keepends=True)
@@ -362,9 +355,9 @@ class Validation(Annotation):
         text = """******************************************************
         Following files are excluded from analysis because they don't align properly. 
         You can find exact lines in which two files mismatch. 
-        
+
         If you find that lines are identical please make sure files have the same encoding. For example, UTF-8 and UTF-8-BOM are not the same!
-        
+
         Minus and plus signs represent lines that are unique in file1 and file2 respectively. 
         Such lines should be aligned manually.\n******************************************************\n\n\n"""
         with open(f"{outputfolder}/unalignedXMLFilesLog.txt", "a", encoding="utf-8") as file:
@@ -412,7 +405,6 @@ class Validation(Annotation):
 
 class Report(Annotation):
 
-
     def __init__(self, files, dir):
         self.dir = dir
 
@@ -431,9 +423,6 @@ class Report(Annotation):
                 self.goldRep.append(gl)
                 self.evalRep.append(ev)
                 self.textRep.append(txt)
-
-
-
 
     def generateDataForAnalysis(self, conll=False):
 
@@ -458,6 +447,7 @@ class Report(Annotation):
                         goldText = gl.read()
                         tags = self.getTagsFromXML(goldText)
                         gold.append(self.generateAnn(goldText, tags))
+
 
                     else:
                         originalAnn = gl.readlines()
@@ -496,6 +486,7 @@ class Report(Annotation):
                 with open(evPath, 'r', encoding='utf-8') as ev:
                     eva = ev.read()
                     tags = self.getTagsFromXML(eva)
+                    print(tags)
                     eval.append(self.generateAnn(eva, tags))
 
         data.append(gold)
@@ -507,10 +498,10 @@ class Report(Annotation):
 
     def analyze(self, outputfolder, data):
 
-
-        gold = data[0]
-        eval = data[1]
+        gold = sorted(data[0])
+        eval = sorted(data[1])
         fileName = data[3]
+
 
         # quantitative analysis
 
@@ -520,15 +511,38 @@ class Report(Annotation):
             tpWeak = 0
             tpWeighted = 0
 
-            for gl in glS:
-                for ev in evS:
-                    tpStrict = tpStrict + self.counttpStrict(ev, gl)
-                    tpWeak = tpWeak + self.countTPWeak(ev, gl)
-                    tpWeighted = tpWeighted + self.countTPWeighted(ev, gl)
 
-            fpStrict = self.countfpStrict(evS, glS)
+            gls = np.array([x.split(None, 4)[1:5] for x in glS])
+            evs = np.array([x.split(None, 4)[1:5] for x in evS])
+
+
+
+            for gl in gls:
+                
+
+                goldAnnotation = gl[0]
+                goldStart = int(gl[1])
+                goldEnd = int(gl[2])
+
+
+                for ev in evs:
+
+                    evalAnnotation = ev[0]
+                    evalStart = int(ev[1])
+                    evalEnd = int(ev[2])
+
+
+                    tpStrict = tpStrict + self.counttpStrict(goldAnnotation, evalAnnotation, goldStart, goldEnd, evalStart, evalEnd)
+                    tpWeak = tpWeak + self.countTPWeak(goldStart, goldEnd, evalStart, evalEnd)
+                    tpWeighted = tpWeighted + self.countTPWeighted(goldStart, goldEnd, evalStart, evalEnd)
+
+            fpStrict = len(evs)-tpStrict
             fpWeak = fpStrict - (tpWeak - tpStrict)
-            fn = self.countFN(evS, glS)
+            fnStrict = len(gls) - tpStrict
+            fnWeak = len(gls) - tpWeak
+
+
+            print("tp strict: {} tpWeak: {}, fpStrict: {}, fpWeak: {}, fnStrict: {}, fn weak: {}".format(tpStrict, tpWeak, fpStrict, fpWeak, fnStrict, fnWeak))
 
             try:
                 strictPrecision = tpStrict / (tpStrict + fpStrict) if tpStrict != 0 and tpStrict + fpStrict != 0 else 0
@@ -536,9 +550,9 @@ class Report(Annotation):
                         tpWeighted + fpStrict) if tpWeighted != 0 and tpWeighted + fpStrict != 0 else 0
                 weakPrecision = tpWeak / (tpWeak + fpWeak) if tpWeak != 0 and tpWeak + fpWeak != 0 else 0
 
-                strictRecall = tpStrict / (tpStrict + fn) if tpStrict != 0 and tpStrict + fn != 0 else 0
-                weightedRecall = tpWeighted / (tpWeighted + fn) if tpWeighted != 0 and tpWeighted + fn != 0 else 0
-                weakRecall = tpWeak / (tpWeak + fn) if tpWeak != 0 and tpWeak + fn != 0 else 0
+                strictRecall = tpStrict / (tpStrict + fnStrict) if tpStrict != 0 and tpStrict + fnStrict != 0 else 0
+                weightedRecall = tpWeighted / (tpWeighted + fnStrict) if tpWeighted != 0 and tpWeighted + fnStrict != 0 else 0
+                weakRecall = tpWeak / (tpWeak + fnWeak) if tpWeak != 0 and tpWeak + fnWeak != 0 else 0
 
                 strictf1 = 2 * strictPrecision * strictRecall / (
                         strictPrecision + strictRecall) if 2 * strictPrecision * strictRecall != 0 and strictPrecision + strictRecall != 0 else 0
@@ -581,28 +595,23 @@ class Report(Annotation):
             with open(outputDir + "/" + str(fnS) + "_REPORT.txt", 'w', encoding='utf-8') as out:
                 out.write(content)
 
-
     @staticmethod
-    def counttpStrict(eval, gold):
-
-        if eval.split(None, 4)[1:] == gold.split(None, 4)[1:]:
+    def counttpStrict(goldAnnotation, evalAnnotation, goldStart, goldEnd, evalStart, evalEnd):
+        if(goldAnnotation==evalAnnotation and goldStart==evalStart and goldEnd==evalEnd):
             return 1
 
         return 0
 
     @staticmethod
-    def countTPWeighted(eval, gold):
+    def countTPWeighted(goldStart, goldEnd, evalStart, evalEnd):
 
-        ev = eval.split(None, 4)
-        gl = gold.split(None, 4)
-
-        if ev[1:] == gl[1:]:
+        if (goldStart == evalStart and goldEnd == evalEnd):
             return 1
 
-        evRange = set(range(int(ev[2]), int(ev[3]) + 1))
-        glRange = set(range(int(gl[2]), int(gl[3]) + 1))
-        evChar = len(ev[4])
-        glChar = len(gl[4])
+        evRange = set(range(evalStart, evalEnd + 1))
+        glRange = set(range(goldStart, goldEnd + 1))
+        evChar = evalEnd-evalStart
+        glChar = goldEnd-goldStart
 
         if evRange.intersection(glRange):
             numberOfIntersectedChars = len(evRange.intersection(glRange))
@@ -611,35 +620,15 @@ class Report(Annotation):
         return 0
 
     @staticmethod
-    def countTPWeak(eval, gold):
+    def countTPWeak(goldStart, goldEnd, evalStart, evalEnd):
 
-        ev = eval.split(None, 4)
-        gl = gold.split(None, 4)
-
-        evRange = set(range(int(ev[2]), int(ev[3]) + 1))
-        glRange = set(range(int(gl[2]), int(gl[3]) + 1))
+        evRange = set(range(evalStart, evalEnd + 1))
+        glRange = set(range(goldStart, goldEnd + 1))
 
         if evRange.intersection(glRange):
             return 1
 
         return 0
-
-    @staticmethod
-    def countfpStrict(eval, gold):
-
-        check = 0
-        count = 0
-        for ev in eval:
-            for gl in gold:
-                if ev.split(None, 4)[1:] != gl.split(None, 4)[1:]:
-                    check = 0
-                else:
-                    check = 1
-                    break
-            if check == 0:
-                count = count + 1
-
-        return count
 
     @staticmethod
     def countFN(eval, gold):
@@ -720,7 +709,7 @@ class Report(Annotation):
 
         }
 		body {
-		
+
     background-color: RGB(219, 225, 241);
 		}
         #text{
@@ -740,8 +729,8 @@ class Report(Annotation):
         #text p{
             background-color: #f1dca7;
         }
-		
-			
+
+
 .TT1_all {border:4px;
 border-style:solid;
 border-color:#f77f00;
@@ -785,9 +774,9 @@ border-bottom: 4px solid #023e8a;
 			list-style-type:none;
 			padding:2rem;
 			font-size:2rem;
-			
+
 		}
-		
+
 		#legends ul li{
 			margin-top: 15px;
 		}
@@ -856,6 +845,7 @@ border-bottom: 4px solid #023e8a;
 
             for annType in visuals:
 
+
                 glN = self.splitByAnnType(glS, annType)
                 evN = self.splitByAnnType(evS, annType)
                 text = txT
@@ -871,8 +861,6 @@ border-bottom: 4px solid #023e8a;
                     changeStatus.append([start, 1])
                     changeStatus.append([end, 3])
 
-
-
                 for g in glN:
                     if g[1] == g[2]:
                         continue
@@ -886,9 +874,6 @@ border-bottom: 4px solid #023e8a;
                     status = 4 if not self.containsKey(changeStatus, end) else self.getValueByKey(changeStatus, end) + 5
                     changeStatus.append([end, status])
 
-
-
-
                 changeStatus = sorted(changeStatus)
 
                 removal = []
@@ -901,11 +886,7 @@ border-bottom: 4px solid #023e8a;
                 for r in removal:
                     changeStatus.remove(r)
 
-
-
                 nbLetterBefore = 0
-
-
 
                 try:
                     entrys = changeStatus
@@ -972,7 +953,6 @@ border-bottom: 4px solid #023e8a;
 
                             if entrys[i][1] == 3 or entrys[i][1] == 4:
 
-
                                 if textStatus == 2:
 
                                     entrys[i][1] = entrys[i][1] + 8
@@ -986,10 +966,7 @@ border-bottom: 4px solid #023e8a;
 
                                 if x == 2:
 
-
                                     if entrys[i + 1][1] == 11:
-
-
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT1_all"><span class="TT2_sta">' + text[
@@ -997,8 +974,6 @@ border-bottom: 4px solid #023e8a;
                                                                                                                                  i][
                                                                                                                                  0] + nbLetterBefore:]
                                     if entrys[i + 1][1] == 12:
-
-
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT1_sta"><span class="TT2_all">' + text[
@@ -1007,7 +982,6 @@ border-bottom: 4px solid #023e8a;
                                                                                                                                  0] + nbLetterBefore:]
 
                                     if entrys[i + 1][1] == 8:
-
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT1_all"><span class="TT2_all">' + text[
@@ -1023,7 +997,6 @@ border-bottom: 4px solid #023e8a;
                                 textStatus = textStatus - 2
 
                             if entrys[i][1] == 9:
-
 
                                 if x == 2:
                                     if entrys[i + 1][1] == 11:
@@ -1054,7 +1027,6 @@ border-bottom: 4px solid #023e8a;
 
                             if entrys[i][1] == 10:
 
-
                                 if x == 2:
                                     if entrys[i + 1][1] == 11:
                                         text = text[
@@ -1071,7 +1043,6 @@ border-bottom: 4px solid #023e8a;
                                                                                                                                  i][
                                                                                                                                  0] + nbLetterBefore:]
                                     if entrys[i + 1][1] == 8:
-
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT1_end"><span class="TT2_all">' + text[
@@ -1079,23 +1050,19 @@ border-bottom: 4px solid #023e8a;
                                                                                                                                  i][
                                                                                                                                  0] + nbLetterBefore:]
 
-
                                     nbLetterBefore = nbLetterBefore + 44
 
                                 textStatus = textStatus + 1
 
                             if entrys[i][1] == 11:
 
-
                                 if x == 2:
                                     if entrys[i + 1][1] == 4 or entrys[i + 1][1] == 6:
-
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT2_end">' + text[entrys[i][
                                                                                                                 0] + nbLetterBefore:]
                                     if entrys[i + 1][1] == 9:
-
                                         text = text[
                                                0:entrys[i][
                                                      0] + nbLetterBefore] + '<span class="TT2_mid">' + text[entrys[i][
@@ -1126,11 +1093,8 @@ border-bottom: 4px solid #023e8a;
 
                         if x == 2:
                             for c in range(textStatus + 1):
-
                                 text = text[0:entrys[i][0] + nbLetterBefore] + '</span>' + text[entrys[i][
                                                                                                     0] + nbLetterBefore:]
-
-
 
                     # creating a file
                     text = text.replace("ᐸ", "<")
@@ -1138,12 +1102,13 @@ border-bottom: 4px solid #023e8a;
                     text = text.replace("<s>", "")
                     text = text.replace("</s>", "")
 
+
                     outputDir = f"{outputFolder}/{fnS}"
                     name = fnS + "_" + annType + ".html"
                     htmlTemplate = self.getHTMLTemplate()
                     with open(outputDir + "/" + name, 'w', encoding='utf-8') as out:
                         out.write(htmlTemplate[0] + text + htmlTemplate[1])
-
+                    print('vizuelizacija kraj')
                 except Exception as e:
                     print('exception: {} -- no entries for {} in {}'.format(e, annType, fnS))
 
