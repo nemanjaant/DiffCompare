@@ -26,13 +26,9 @@ def compareNER():
     if request.method == 'POST':
 
         f = request.files['file']  # get the file from the files object
-        visuals = request.form.getlist('entities')
+        visuals = request.form['text']
+        visuals = visuals.split(",")
 
-
-
-        if "ALL" in visuals:
-            visuals = ["PERS", "LOC", "ORG", "ROLE", "DEMO", "WORK", "EVENT", 'MONEY', 'DEMONYM', 'TIME', 'AMOUNT',
-                       'PERCENT', 'MEASURE']
 
         # Saving the file in the required destination
         timestamp = str(datetime.utcnow()).replace(":", ".").replace(" ", ".")
@@ -129,6 +125,7 @@ def compareNER():
                             path = 'C:/Users/asus/PycharmProjects/flaskProject/' + outputFolder
                             visuals.insert(0, "REPORT")
                             tableData = report.generateTableData(path, visuals)
+                            print(tableData)
                             donwnloadPath = 'C:/Users/asus/PycharmProjects/flaskProject/' + outputFolder + '.zip'
 
                             return render_template("appInterface.html", data=tableData[0], lenData=len(tableData[0]),
