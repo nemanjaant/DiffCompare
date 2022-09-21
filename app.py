@@ -117,7 +117,8 @@ def compareNER():
 
                             report = Report(aligned, directory)
                             data = report.generateDataForAnalysis(conll)
-                            report.analyze(outputFolder, data)
+                            report.analyze(outputFolder, data, visuals)
+                            report.analyzeByTypes(outputFolder, data, visuals)
                             report.getVisualData(outputFolder, visuals, data)
                             shutil.make_archive(outputFolder, 'zip', outputFolder)
                             # shutil.rmtree(outputFolder)  # removing output folder after creating zip
