@@ -486,7 +486,6 @@ class Report(Annotation):
                 with open(evPath, 'r', encoding='utf-8') as ev:
                     eva = ev.read()
                     tags = self.getTagsFromXML(eva)
-                    print(tags)
                     eval.append(self.generateAnn(eva, tags))
 
         data.append(gold)
@@ -496,63 +495,227 @@ class Report(Annotation):
 
         return data
 
-    def analyze(self, outputfolder, data):
-
+    def analyzeByTypes(self, outputFolder, data, visuals):
         gold = sorted(data[0])
         eval = sorted(data[1])
-        fileName = data[3]
 
+
+        fileName = data[3]
 
         # quantitative analysis
 
         for i, (glS, evS, fnS) in enumerate((zip(gold, eval, fileName))):
 
-            tpStrict = 0
+            TPentitiesALL = []
+            FNentitiesALL = []
             tpWeak = 0
             tpWeighted = 0
 
+            for type in visuals:
+                type = type.strip()
+                goldByType = []
+                evalByType = []
 
-            gls = np.array([x.split(None, 4)[1:5] for x in glS])
-            evs = np.array([x.split(None, 4)[1:5] for x in evS])
+                for gl in glS:
+                    if gl.split(None, 4)[1]==type:
+                        goldByType.append(gl)
 
+                print(len(goldByType), goldByType)
 
+                for ev in evS:
+                    if ev.split(None, 4)[1]==type:
+                        evalByType.append(ev)
 
-            for gl in gls:
-                
+                print(len(evalByType), evalByType)
 
-                goldAnnotation = gl[0]
-                goldStart = int(gl[1])
-                goldEnd = int(gl[2])
+                for gl in goldByType:
+                    for ev in evalByType:
+                        TPentitiesALL.append(self.counttpStrict(ev, gl))
+                        tpWeak = tpWeak + self.countTPWeak(ev, gl)
+                        tpWeighted = tpWeighted + self.countTPWeighted(ev, gl)
 
+                        evEntitet = ev.split(None, 4)[1]
+                        glEntitet = gl.split(None, 4)[1]
+                        evStart = ev.split(None, 4)[2]
+                        glStart = gl.split(None, 4)[2]
+                        evEnd = ev.split(None, 4)[3]
+                        glEnd = gl.split(None, 4)[3]
+                        if evEntitet != glEntitet and evStart == glStart and evEnd == glEnd:
+                            FNentitiesALL.append(['model: ' + ev + 'gold: ' + gl])
 
-                for ev in evs:
+                TPentitiesALL = [i for i in TPentitiesALL if i is not None]
+                FPentitiesALL = [i for i in evalByType if i not in TPentitiesALL]
 
-                    evalAnnotation = ev[0]
-                    evalStart = int(ev[1])
-                    evalEnd = int(ev[2])
+                goldObrisiSrediKasnije = []
+                for gl in goldByType:
+                    gl = " ".join(gl.split(None, 4)[1:])
+                    goldObrisiSrediKasnije.append(gl)
 
+                TPentitiesALLObrisiSrediKasnije = []
+                for gl in TPentitiesALL:
+                    gl = " ".join(gl.split(None, 4)[1:])
+                    TPentitiesALLObrisiSrediKasnije.append(gl)
 
-                    tpStrict = tpStrict + self.counttpStrict(goldAnnotation, evalAnnotation, goldStart, goldEnd, evalStart, evalEnd)
-                    tpWeak = tpWeak + self.countTPWeak(goldStart, goldEnd, evalStart, evalEnd)
-                    tpWeighted = tpWeighted + self.countTPWeighted(goldStart, goldEnd, evalStart, evalEnd)
+                FNentitiesALLObrisiSrediKasnije = [i for i in goldObrisiSrediKasnije if
+                                                   i not in TPentitiesALLObrisiSrediKasnije] + FNentitiesALL
+                FNnova = len(FNentitiesALLObrisiSrediKasnije)
+                print("fn nova: ", FNnova)
+                tpStrict = len(TPentitiesALL)
+                print('nova FP: ', len(FPentitiesALL))
+                fpStrict = self.countfpStrict(evalByType, goldByType)
+                fpWeak = fpStrict - (tpWeak - tpStrict)
+                fn = self.countFN(evalByType, goldByType)
 
-            fpStrict = len(evs)-tpStrict
+                print(
+                    "tp strict: {} tpWeak: {}, fpStrict: {}, fpWeak: {}, fn: {}".format(tpStrict, tpWeak,
+                                                                                        fpStrict, fpWeak,
+                                                                                        fn))
+                try:
+                    print(tpStrict)
+                    strictPrecision = tpStrict / (tpStrict + fpStrict) if tpStrict != 0 and tpStrict + fpStrict != 0 else 0
+                    weightedPrecision = tpWeighted / (
+                            tpWeighted + fpStrict) if tpWeighted != 0 and tpWeighted + fpStrict != 0 else 0
+                    weakPrecision = tpWeak / (tpWeak + fpWeak) if tpWeak != 0 and tpWeak + fpWeak != 0 else 0
+
+                    strictRecall = tpStrict / (tpStrict + fn) if tpStrict != 0 and tpStrict + fn != 0 else 0
+                    weightedRecall = tpWeighted / (tpWeighted + fn) if tpWeighted != 0 and tpWeighted + fn != 0 else 0
+                    weakRecall = tpWeak / (tpWeak + fn) if tpWeak != 0 and tpWeak + fn != 0 else 0
+
+                    strictf1 = 2 * strictPrecision * strictRecall / (
+                            strictPrecision + strictRecall) if 2 * strictPrecision * strictRecall != 0 and strictPrecision + strictRecall != 0 else 0
+                    weightedf1 = 2 * weightedPrecision * weightedRecall / (
+                            weightedPrecision + weightedRecall) if 2 * weightedPrecision * weightedRecall != 0 and weightedPrecision + weightedRecall != 0 else 0
+                    weakf1 = 2 * weakPrecision * weakRecall / (
+                            weakPrecision + weakRecall) if 2 * weakPrecision * weakRecall != 0 and weakPrecision + weakRecall != 0 else 0
+                except Exception as ex:
+                    print(ex)
+                    strictPrecision = 0
+                    weightedPrecision = 0
+                    weakPrecision = 0
+                    strictRecall = 0
+                    weightedRecall = 0
+                    weakRecall = 0
+                    strictf1 = 0
+                    weightedf1 = 0
+                    weakf1 = 0
+
+                # save output in output/FILENAMEdir
+                outputDir = f"{outputFolder}/{fnS}"
+                if not os.path.exists(outputDir):
+                    os.mkdir(outputDir)
+                content = f"""
+                **PRECISION**
+                strict precision: {format(strictPrecision, '.3f')}
+                weighted precision: {format(weightedPrecision, '.3f')}
+                weak precision: {format(weakPrecision, '.3f')}
+    
+                **RECALL**
+                strict recall: {format(strictRecall, '.3f')}
+                weighted recall: {format(weightedRecall, '.3f')}
+                weak recall: {format(weakRecall, '.3f')}
+    
+                **F1**
+                strict F1: {format(strictf1, '.3f')}
+                weighted F1: {format(weightedf1, '.3f')}
+                weak F1: {format(weakf1, '.3f')}
+                                   """
+                with open(outputDir + "/" + str(fnS) + "_REPORT_" + type + ".txt", 'w', encoding='utf-8') as out:
+                    out.write(content)
+                with open(outputDir + "/" + str(fnS) + "_REPORT_" + type + ".txt", 'w', encoding='utf-8') as out:
+                    out.write(content)
+
+                TPentitiesALLcontent = ""
+
+                for ent in TPentitiesALL:
+                    TPentitiesALLcontent = TPentitiesALLcontent + ent
+                with open(outputDir + "/" + str(fnS) + "_TP_" + type + ".txt", 'a', encoding='utf-8') as out:
+                    out.write(TPentitiesALLcontent)
+
+                FPentitiesALLcontent = ""
+
+                for ent in FPentitiesALL:
+                    FPentitiesALLcontent = FPentitiesALLcontent + ent
+                with open(outputDir + "/" + str(fnS) + "_FP_" + type + ".txt", 'a', encoding='utf-8') as out:
+                    out.write(FPentitiesALLcontent)
+
+                FNEntitiesALLContent = ""
+
+                for ent in FNentitiesALLObrisiSrediKasnije:
+                    FNEntitiesALLContent = FNEntitiesALLContent + ent
+                with open(outputDir + "/" + str(fnS) + "_FN_" + type + ".txt", 'a', encoding='utf-8') as out:
+                    out.write(FNEntitiesALLContent)
+
+    def analyze(self, outputfolder, data, type=None):
+
+        gold = sorted(data[0])
+        eval = sorted(data[1])
+        if type is None:
+            type="ALL"
+
+        fileName = data[3]
+
+        # quantitative analysis
+
+        for i, (glS, evS, fnS) in enumerate((zip(gold, eval, fileName))):
+
+            TPentitiesALL = []
+            FNentitiesALL = []
+            tpWeak = 0
+            tpWeighted = 0
+
+            for gl in glS:
+                for ev in evS:
+                    TPentitiesALL.append(self.counttpStrict(ev, gl))
+                    tpWeak = tpWeak + self.countTPWeak(ev, gl)
+                    tpWeighted = tpWeighted + self.countTPWeighted(ev, gl)
+
+                    evEntitet = ev.split(None, 4)[1]
+                    glEntitet = gl.split(None, 4)[1]
+                    evStart = ev.split(None, 4)[2]
+                    glStart = gl.split(None, 4)[2]
+                    evEnd = ev.split(None, 4)[3]
+                    glEnd = gl.split(None, 4)[3]
+                    if evEntitet!=glEntitet and evStart==glStart and evEnd==glEnd:
+
+                        FNentitiesALL.append(['model: ' + ev + 'gold: ' + gl])
+
+            TPentitiesALL = [i for i in TPentitiesALL if i is not None]
+            FPentitiesALL = [i for i in evS if i not in TPentitiesALL]
+
+            goldObrisiSrediKasnije = []
+            for gl in glS:
+                gl = " ".join(gl.split(None, 4)[1:])
+                goldObrisiSrediKasnije.append(gl)
+
+            TPentitiesALLObrisiSrediKasnije = []
+            for gl in TPentitiesALL:
+                gl = " ".join(gl.split(None, 4)[1:])
+                TPentitiesALLObrisiSrediKasnije.append(gl)
+
+            FNentitiesALLObrisiSrediKasnije = [i for i in goldObrisiSrediKasnije if i not in TPentitiesALLObrisiSrediKasnije] + FNentitiesALL
+            FNnova = len(FNentitiesALLObrisiSrediKasnije)
+            print("fn nova: ", FNnova)
+            tpStrict = len(TPentitiesALL)
+            print('nova FP: ', len(FPentitiesALL))
+            fpStrict = self.countfpStrict(evS, glS)
             fpWeak = fpStrict - (tpWeak - tpStrict)
-            fnStrict = len(gls) - tpStrict
-            fnWeak = len(gls) - tpWeak
+            fn = self.countFN(evS, glS)
 
 
-            print("tp strict: {} tpWeak: {}, fpStrict: {}, fpWeak: {}, fnStrict: {}, fn weak: {}".format(tpStrict, tpWeak, fpStrict, fpWeak, fnStrict, fnWeak))
-
+            print(
+                "tp strict: {} tpWeak: {}, fpStrict: {}, fpWeak: {}, fn: {}".format(tpStrict, tpWeak,
+                                                                                    fpStrict, fpWeak,
+                                                                                    fn))
             try:
+                print(tpStrict)
                 strictPrecision = tpStrict / (tpStrict + fpStrict) if tpStrict != 0 and tpStrict + fpStrict != 0 else 0
                 weightedPrecision = tpWeighted / (
                         tpWeighted + fpStrict) if tpWeighted != 0 and tpWeighted + fpStrict != 0 else 0
                 weakPrecision = tpWeak / (tpWeak + fpWeak) if tpWeak != 0 and tpWeak + fpWeak != 0 else 0
 
-                strictRecall = tpStrict / (tpStrict + fnStrict) if tpStrict != 0 and tpStrict + fnStrict != 0 else 0
-                weightedRecall = tpWeighted / (tpWeighted + fnStrict) if tpWeighted != 0 and tpWeighted + fnStrict != 0 else 0
-                weakRecall = tpWeak / (tpWeak + fnWeak) if tpWeak != 0 and tpWeak + fnWeak != 0 else 0
+                strictRecall = tpStrict / (tpStrict + fn) if tpStrict != 0 and tpStrict + fn != 0 else 0
+                weightedRecall = tpWeighted / (tpWeighted + fn) if tpWeighted != 0 and tpWeighted + fn != 0 else 0
+                weakRecall = tpWeak / (tpWeak + fn) if tpWeak != 0 and tpWeak + fn != 0 else 0
 
                 strictf1 = 2 * strictPrecision * strictRecall / (
                         strictPrecision + strictRecall) if 2 * strictPrecision * strictRecall != 0 and strictPrecision + strictRecall != 0 else 0
@@ -577,41 +740,73 @@ class Report(Annotation):
             if not os.path.exists(outputDir):
                 os.mkdir(outputDir)
             content = f"""
- **PRECISION**
- strict precision: {format(strictPrecision, '.3f')}
- weighted precision: {format(weightedPrecision, '.3f')}
- weak precision: {format(weakPrecision, '.3f')}
+    **PRECISION**
+    strict precision: {format(strictPrecision, '.3f')}
+    weighted precision: {format(weightedPrecision, '.3f')}
+    weak precision: {format(weakPrecision, '.3f')}
 
- **RECALL**
- strict recall: {format(strictRecall, '.3f')}
- weighted recall: {format(weightedRecall, '.3f')}
- weak recall: {format(weakRecall, '.3f')}
+    **RECALL**
+    strict recall: {format(strictRecall, '.3f')}
+    weighted recall: {format(weightedRecall, '.3f')}
+    weak recall: {format(weakRecall, '.3f')}
 
- **F1**
- strict F1: {format(strictf1, '.3f')}
- weighted F1: {format(weightedf1, '.3f')}
- weak F1: {format(weakf1, '.3f')}
-                    """
-            with open(outputDir + "/" + str(fnS) + "_REPORT.txt", 'w', encoding='utf-8') as out:
+    **F1**
+    strict F1: {format(strictf1, '.3f')}
+    weighted F1: {format(weightedf1, '.3f')}
+    weak F1: {format(weakf1, '.3f')}
+                       """
+            with open(outputDir + "/" + str(fnS) + "_REPORT_"+type+".txt", 'w', encoding='utf-8') as out:
                 out.write(content)
 
+            TPentitiesALLcontent = ""
+
+            for ent in TPentitiesALL:
+                TPentitiesALLcontent = TPentitiesALLcontent+ent
+            with open(outputDir + "/" + str(fnS) + "_TP_"+type+".txt", 'a', encoding='utf-8') as out:
+                out.write(TPentitiesALLcontent)
+
+            FPentitiesALLcontent = ""
+
+            for ent in FPentitiesALL:
+                FPentitiesALLcontent = FPentitiesALLcontent + ent
+            with open(outputDir + "/" + str(fnS) + "_FP_" + type + ".txt", 'a', encoding='utf-8') as out:
+                out.write(FPentitiesALLcontent)
+
+            FNEntitiesALLContent = ""
+
+            for ent in FNentitiesALLObrisiSrediKasnije:
+                if isinstance(ent, list):
+                    ent = " ".join(ent)
+                FNEntitiesALLContent = FNEntitiesALLContent + ent
+            with open(outputDir + "/" + str(fnS) + "_FN_" + type + ".txt", 'a', encoding='utf-8') as out:
+                out.write(FNEntitiesALLContent)
+
+
+
     @staticmethod
-    def counttpStrict(goldAnnotation, evalAnnotation, goldStart, goldEnd, evalStart, evalEnd):
-        if(goldAnnotation==evalAnnotation and goldStart==evalStart and goldEnd==evalEnd):
+    def counttpStrict(eval, gold):
+
+        if eval.split(None, 4)[1:] == gold.split(None, 4)[1:]:
+
+            return eval
+
+        else:
+            return None
+
+
+    @staticmethod
+    def countTPWeighted(eval, gold):
+
+        ev = eval.split(None, 4)
+        gl = gold.split(None, 4)
+
+        if ev[1:] == gl[1:]:
             return 1
 
-        return 0
-
-    @staticmethod
-    def countTPWeighted(goldStart, goldEnd, evalStart, evalEnd):
-
-        if (goldStart == evalStart and goldEnd == evalEnd):
-            return 1
-
-        evRange = set(range(evalStart, evalEnd + 1))
-        glRange = set(range(goldStart, goldEnd + 1))
-        evChar = evalEnd-evalStart
-        glChar = goldEnd-goldStart
+        evRange = set(range(int(ev[2]), int(ev[3]) + 1))
+        glRange = set(range(int(gl[2]), int(gl[3]) + 1))
+        evChar = len(ev[4])
+        glChar = len(gl[4])
 
         if evRange.intersection(glRange):
             numberOfIntersectedChars = len(evRange.intersection(glRange))
@@ -620,15 +815,36 @@ class Report(Annotation):
         return 0
 
     @staticmethod
-    def countTPWeak(goldStart, goldEnd, evalStart, evalEnd):
+    def countTPWeak(eval, gold):
 
-        evRange = set(range(evalStart, evalEnd + 1))
-        glRange = set(range(goldStart, goldEnd + 1))
+        ev = eval.split(None, 4)
+        gl = gold.split(None, 4)
+
+        evRange = set(range(int(ev[2]), int(ev[3]) + 1))
+        glRange = set(range(int(gl[2]), int(gl[3]) + 1))
 
         if evRange.intersection(glRange):
             return 1
 
         return 0
+
+    @staticmethod
+    def countfpStrict(eval, gold):
+
+        check = 0
+        count = 0
+        falsePositives = []
+        for ev in eval:
+            for gl in gold:
+                if ev.split(None, 4)[1:] != gl.split(None, 4)[1:]:
+                    check = 0
+                else:
+                    check = 1
+                    break
+            if check == 0:
+                count = count + 1
+
+        return count
 
     @staticmethod
     def countFN(eval, gold):
@@ -653,7 +869,7 @@ class Report(Annotation):
                 if ev.split(None, 4)[1] != gl.split(None, 4)[1] and ev.split(None, 4)[2:] == gl.split(None, 4)[2:]:
                     wrongLabel = wrongLabel + 1
 
-        return count - wrongLabel
+        return count + wrongLabel
 
     def splitByAnnType(self, annotation, annType):
         result = []
