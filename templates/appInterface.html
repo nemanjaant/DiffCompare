@@ -157,6 +157,7 @@
                     about the exact lines that need to be aligned</li>
 
                 <li>if you don't get visualization for desired entity, it means it's not present in annotated files</li>
+                <li>for correct analysis of conll files, they must be formed correctly: each line for one token</li>
                 <li>if you don't get proper output for cases where some files are of ann type, characters in ann probably don't align with corresponding text/xml files</li>
                 <li>size of zipped file can't exceed 20 MB</li>
 
@@ -174,63 +175,9 @@
                     <label for="entities" id="typesLabel">Types of entities for visualization:</label>
 
                     <div class="row">
-                        <input id="PERS" type="checkbox" name="entities" value="PERS">
-                        <label for="PERS">PERS</label>
-                    </div>
-                    <div class="row">
-                        <input id="LOC" type="checkbox" name="entities" value="LOC">
-                        <label for="LOC">LOC</label>
-                    </div>
-                    <div class="row">
-                        <input id="ORG" type="checkbox" name="entities" value="ORG">
-                        <label for="ORG">ORG</label>
-                    </div>
-                    <div class="row">
-                        <input id="ROLE" type="checkbox" name="entities" value="ROLE">
-                        <label for="ROLE">ROLE</label>
-                    </div>
-                    <div class="row">
-                        <input id="DEMO" type="checkbox" name="entities" value="DEMO">
-                        <label for="DEMO">DEMO</label>
-                    </div>
-                    <div class="row">
-                        <input id="WORK" type="checkbox" name="entities" value="WORK">
-                        <label for="WORK">WORK</label>
-                    </div>
-                    <div class="row">
-                        <input id="EVENT" type="checkbox" name="entities" value="EVENT">
-                        <label for="EVENT">EVENT</label>
-                    </div>
-                    <div class="row">
-                        <input id="MONEY" type="checkbox" name="entities" value="MONEY">
-                        <label for="MONEY">MONEY</label>
-                    </div>
-                    <div class="row">
-                        <input id="DEMONYM" type="checkbox" name="entities" value="DEMONYM">
-                        <label for="DEMONYM">DEMONYM</label>
-                    </div>
-                    <div class="row">
-                        <input id="TIME" type="checkbox" name="entities" value="TIME">
-                        <label for="TIME">TIME</label>
-                    </div>
-                    <div class="row">
-                        <input id="AMOUNT" type="checkbox" name="entities" value="AMOUNT">
-                        <label for="AMOUNT">AMOUNT</label>
-                    </div>
-                    <div class="row">
-                        <input id="PERCENT" type="checkbox" name="entities" value="PERCENT">
-                        <label for="PERCENT">PERCENT</label>
-                    </div>
-                    <div class="row">
-                        <input id="MEASURE" type="checkbox" name="entities" value="MEASURE">
-                        <label for="MEASURE">MEASURE</label>
+                         <input type="text" name="text" />
                     </div>
 
-
-                    <div class="row">
-                        <input id="ALL" type="checkbox" name="entities" value="ALL">
-                        <label for="ALL">ALL</label>
-                    </div>
                     <div class="row">
                         <input type="submit" value="Upload" />
                     </div>
