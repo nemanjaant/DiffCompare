@@ -1,0 +1,17 @@
+
+                    **PRECISION**
+    strict precision: 0.562
+    weighted precision: 0.855
+    weak precision: 0.905
+
+    **RECALL**
+    strict recall: 0.457
+    weighted recall: 0.457
+    weak recall: 0.576
+
+    **F1**
+    strict F1: 0.504
+    weighted F1: 0.596
+    weak F1: 0.704
+
+                                       
