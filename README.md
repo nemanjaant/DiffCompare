@@ -1,7 +1,7 @@
 # DiffCompare -- A web tool for comparing annotations in XML, standoff (ann) and CoNLL-2002 format
 
 
-DiffCompare is an online tool for evaluating named entity recognition models. It provides quantitative (precision, recall and F1) and qualitative (visualization) data analysis.
+DiffCompare is a web application for evaluating Named Entity Recognition (NER) models. It provides quantitative (precision, recall and F1 measures) and qualitative (visualization) data analysis.
 
 The input data should be prepared in a zip file, with the structure defined below. 
 
@@ -21,7 +21,7 @@ In case of a mismatch, the user receives information about the exact lines in wh
  
 If it is determined that the files completely match, but are still excluded from the analysis, there is a possibility that they are encoded differently, which should be corrected. A different encoding usually causes a log file entry like the image below, where the first line is shown to be different:
 
-![slika](https://user-images.githubusercontent.com/49460346/227199549-7ed27df5-d259-4b23-afc2-fdff08ed4083.png)
+![slika](https://user-images.githubusercontent.com/49460346/227259368-3644a599-23c4-4c53-9f5d-b62b68a74373.png)
 
 While for standoff and XML format it is possible to combine input files, with CoNLL-2002 format, the gold standard file and its counterpart in the evaluation standard must be CoNLL-2002. In that case, the text file is not needed.
 
