@@ -26,8 +26,8 @@ def compareNER():
     if request.method == 'POST':
 
         f = request.files['file']  # get the file from the files object
-        visuals = request.form['text']
-        visuals = visuals.split(",")
+        visuals = request.form['entities']
+        visuals = [v.strip() for v in visuals.split(",")]
 
 
         # Saving the file in the required destination
@@ -118,7 +118,6 @@ def compareNER():
                             report = Report(aligned, directory)
                             data = report.generateDataForAnalysis(conll)
                             report.analyze(outputFolder, data, visuals)
-                            report.analyzeByTypes(outputFolder, data, visuals)
                             report.getVisualData(outputFolder, visuals, data)
                             shutil.make_archive(outputFolder, 'zip', outputFolder)
                             # shutil.rmtree(outputFolder)  # removing output folder after creating zip
